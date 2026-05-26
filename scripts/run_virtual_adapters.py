@@ -79,7 +79,6 @@ def main():
             print("\nNo containers were successfully started. Exiting.")
             return
 
-        print("\nAll requested containers deployed. Press Ctrl+C to stop and remove them.")
         while True:
             time.sleep(1)
 
