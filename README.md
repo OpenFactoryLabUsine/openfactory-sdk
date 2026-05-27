@@ -190,6 +190,8 @@ If you're contributing to the SDK itself or developing Dev Container features, y
 
 ## Quick start CNC
 
+0. Assurez vous d'avoir Docker d'installé. Aussi, pour pouvoir ouvrir OpenFactory sur une machine Windows, il faut d'abord s'assurer d'avoir WSL2. Le devcontainer doit être ouvert à partir d'un environnement Linux pour qu'il fonctionne (faites 'reopen in container' pour ouvrir le devcontainer).
+
 1. Si OpenFactory était déjà ouvert précédemment et les containers n'ont pas pu fermer correctement, vous pouvez commencer par faire `teardown` et `opcua-connector-down` pour s'assurer de commencer avec un proejt clean.
 
 2. Pour démarrer OpenFactory, exécuter la commande `spinup` et `opcua-connector-up`. La commande spinup permet de démarrer l'infrastructure d'OpenFactory et opcua-connector-up permet de démarrer le container qui écoute les données du serveur OPC-UA venant du device.
