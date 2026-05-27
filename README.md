@@ -186,3 +186,18 @@ If you're contributing to the SDK itself or developing Dev Container features, y
 ```
 
 > ⚠️ The local SDK path (`/workspaces/openfactory-sdk`) is only available **after** the container starts — so editable installs must happen via `postCreateCommand` or `postStartCommand`, not inside the feature itself.
+
+
+## Quick start CNC
+
+1. Si OpenFactory était déjà ouvert précédemment et les containers n'ont pas pu fermer correctement, vous pouvez commencer par faire `teardown` et `opcua-connector-down` pour s'assurer de commencer avec un proejt clean.
+
+2. Pour démarrer OpenFactory, exécuter la commande `spinup` et `opcua-connector-up`. La commande spinup permet de démarrer l'infrastructure d'OpenFactory et opcua-connector-up permet de démarrer le container qui écoute les données du serveur OPC-UA venant du device.
+
+3. Pour démarrer tous les components nécessaires à la connection à la CNC virtuelle, vous pouvez exécuter `python ./scripts/spinup_cnc.py`à partir du root du projet. ** Il faut s'assurer que websockets soit installé sur l'environnement avant de lancer le script avec `pip install websockets`.
+
+4. Pour s'assurer du bon fonctionnement de l'API et visualiser les données venant de la CNC virtuelle, vous pouvez exécuter `python dummy_client.py` pour avoir la liste des équipements disponibles, puis `python dummy_client.py cnc` pour avoir les mises à jour en temps réel les données de la CNC. 
+
+
+
+
