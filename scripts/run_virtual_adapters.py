@@ -7,19 +7,19 @@ IMAGE_CONFIGS = {
         "image_path": "ghcr.io/openfactorylabusine/virtual-cnc-adapter:latest",
         "name": "virtual-cnc-adapter",
         "ports": {'4842/tcp': 4842},
-        "network": "openfactory-opcua_default"
+        "network": "factory-net"
     },
     "dusttrak": {
         "image_path": "ghcr.io/openfactorylabusine/virtual-dusttrak-adapter:latest",
         "name": "virtual-dusttrak-adapter",
         "ports": {'4841/tcp': 4841},
-        "network": "openfactory-opcua_default"
+        "network": "factory-net"
     },
     "wtvb01": {
         "image_path": "ghcr.io/openfactorylabusine/virtual-wtvb01-adapter:latest",
         "name": "virtual-wtvb01-adapter",
         "ports": {'4844/tcp': 4844},
-        "network": "openfactory-opcua_default"
+        "network": "factory-net"
     }
 }
 
