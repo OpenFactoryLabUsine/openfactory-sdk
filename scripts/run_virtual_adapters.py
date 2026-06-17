@@ -7,19 +7,19 @@ IMAGE_CONFIGS = {
         "image_path": "ghcr.io/openfactorylabusine/virtual-cnc-adapter:latest",
         "name": "virtual-cnc-adapter",
         "ports": {'4842/tcp': 4842},
-        "network": "openfactory-opcua_default"
+        "network": "factory-net"
     },
     "dusttrak": {
         "image_path": "ghcr.io/openfactorylabusine/virtual-dusttrak-adapter:latest",
         "name": "virtual-dusttrak-adapter",
         "ports": {'4841/tcp': 4841},
-        "network": "openfactory-opcua_default"
+        "network": "factory-net"
     },
     "wtvb01": {
         "image_path": "ghcr.io/openfactorylabusine/virtual-wtvb01-adapter:latest",
         "name": "virtual-wtvb01-adapter",
         "ports": {'4844/tcp': 4844},
-        "network": "openfactory-opcua_default"
+        "network": "factory-net"
     }
 }
 
@@ -30,12 +30,26 @@ def parse_arguments():
         nargs='+', 
         help='List of device shorthand names to run (e.g., cnc, dusttrak, wtvb01)'
     )
+    parser.add_argument(
+        '--virtual',
+        action='store_true',
+        default=True,
+        help='Pass virtual mode status to the adapter instances'
+    )
+    parser.add_argument(
+        '--no-virtual',
+        dest='virtual',
+        action='store_false',
+        help='Disable virtual mode and force adapters to look for real hardware devices'
+    )
     return parser.parse_args()
 
 def main():
     args = parse_arguments()
     client = docker.from_env()
     running_containers = []
+
+    virtual_env_value = "true" if args.virtual else "false"
 
     try:
         for device in args.devices:
@@ -64,13 +78,15 @@ def main():
             except docker.errors.NotFound:
                 pass
 
-            print(f"Starting container '{container_name}'...")
+            print(f"Starting container '{container_name}' (Virtual: {virtual_env_value})...")
+            
             container = client.containers.run(
                 image_path,
                 detach=True,
                 name=container_name,
                 ports=ports,
-                network=network
+                network=network,
+                environment={"VIRTUAL_DEVICE": virtual_env_value}
             )
             running_containers.append(container)
             print(f"Container {container.short_id} is running.")
