@@ -30,7 +30,7 @@ mkdir -p "/usr/local/share/openfactory-sdk/telegraf"
 cp "$(dirname "$0")/assets/telegraf/telegraf.conf" "/usr/local/share/openfactory-sdk/telegraf/telegraf.conf"
 
 echo "📁 Copying helper scripts..."
-for script in spinup.sh teardown.sh create_topics.sh openfactory-sdk-startup.sh topics.yml; do
+for script in spinup.sh teardown.sh create_topics.sh openfactory-sdk-startup.sh topics.yml create_ksqldb_streams.sh; do
   cp "$(dirname "$0")/assets/$script" /usr/local/bin/$script
   chmod +x /usr/local/bin/$script
 done
