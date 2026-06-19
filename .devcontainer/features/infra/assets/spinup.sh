@@ -23,6 +23,22 @@ SDK_PATH="/usr/local/share/openfactory-sdk"
 KAFKA_COMPOSE_FILE="${SDK_PATH}/openfactory-infra/docker-compose.yml"
 TRAEFIK_COMPOSE_FILE="${SDK_PATH}/openfactory-infra/docker-compose.traefik.yml"
 FAN_OUT_LAYER_COMPOSE_FILE="${SDK_PATH}/openfactory-fanoutlayer/docker-compose.yml"
+INFLUXDB_COMPOSE_FILE="${SDK_PATH}/openfactory-infra/docker-compose.influxdb.yml"
+
+# Ensure InfluxDB can write its bind-mounted data directory.
+INFLUXDB_DATA_DIR="/workspaces/openfactory-sdk/influxdb3/"
+if [ ! -e "${INFLUXDB_DATA_DIR}" ]; then
+  mkdir -p "${INFLUXDB_DATA_DIR}"
+fi
+sudo chown -R 1500:1500 "${INFLUXDB_DATA_DIR}"
+
+# Ensure the Explorer UI can write its SQLite database.
+INFLUX_EXPLORER_DB_DIR="/workspaces/openfactory-sdk/influxdb3-ui"
+if [ ! -e "${INFLUX_EXPLORER_DB_DIR}" ]; then
+  mkdir -p "${INFLUX_EXPLORER_DB_DIR}"
+fi
+sudo chown -R 1500:1500 "${INFLUX_EXPLORER_DB_DIR}"
+
 
 # Spin up containers
 echo "🐳  Deploying Kafka CLuster ..."
@@ -31,6 +47,10 @@ docker compose -f "$KAFKA_COMPOSE_FILE" -p kafka-cluster up -d
 # Setup Traefik
 echo "🐳  Deploying Treafik ..."
 docker compose -f "$TRAEFIK_COMPOSE_FILE" -p traefik up -d
+
+# Setup InfluxDB
+echo "🐳  Deploying InfluxDB ..."
+docker compose -f "$INFLUXDB_COMPOSE_FILE" -p influxdb up -d
 
 # Setup required Kafka topics
 echo "⚙️  Setting up Kafka topics ..."

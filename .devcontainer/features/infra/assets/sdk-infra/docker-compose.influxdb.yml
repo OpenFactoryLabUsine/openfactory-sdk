@@ -1,0 +1,77 @@
+services:
+
+  influxdb3-enterprise:
+    image: influxdb:3-enterprise
+    ports:
+      - 8181:8181
+    networks:
+      - factory-net
+    command:
+      - influxdb3
+      - serve
+      - --node-id=node0
+      - --object-store=file
+      - --data-dir=/var/lib/influxdb3/data
+      # - --plugin-dir=/var/lib/influxdb3/plugins
+      - --cluster-id=cluster0
+      - --license-email=LEHOF1+home@ulaval.ca
+      - --license-type=home
+    environment:
+      - INFLUXDB3_ENTERPRISE_LICENSE_EMAIL=LEHOF1+home@ulaval.ca
+      - INFLUXDB3_ENTERPRISE_LICENSE_TYPE=home
+    volumes:
+      - type: bind
+        source: /workspaces/openfactory-sdk/influxdb3/data
+        target: /var/lib/influxdb3/data
+      - type: bind
+        source: /workspaces/openfactory-sdk/influxdb3/plugins
+        target: /var/lib/influxdb3/plugins
+
+  explorer:
+    image: influxdata/influxdb3-ui:1.8.0
+    container_name: influxdb3-explorer
+    pull_policy: always
+    command:
+      - --mode=admin
+    ports:
+      - 8888:8080
+    volumes:
+      - type: bind
+        source: /workspaces/openfactory-sdk/influxdb3-ui/db
+        target: /db
+      - type: bind
+        source: /workspaces/openfactory-sdk/influxdb3-ui/config
+        target: /app-root/config
+        read_only: true
+      - type: bind
+        source: /workspaces/openfactory-sdk/influxdb3-ui/ssl
+        target: /etc/nginx/ssl
+        read_only: true
+    environment:
+      SESSION_SECRET_KEY: ${SESSION_SECRET_KEY:-changeme123456789012345678901234}
+    restart: unless-stopped
+    networks:
+      - factory-net
+
+  # telegraf:
+  #     image: telegraf:1.39.0
+  #     container_name: telegraf
+  #     command: --config /etc/telegraf/telegraf.conf --once
+  #     networks:
+  #       - factory-net
+  #     volumes:
+  #       - type: bind
+  #         source: ../telegraf/telegraf.conf
+  #         target: /etc/telegraf/telegraf.conf
+  #         read_only: true
+  #       - type: bind
+  #         source: /tmp/influx_raw.csv
+  #         target: /tmp/influx_raw.csv
+  #         read_only: false
+  #     depends_on:
+  #       - influxdb3-enterprise
+
+
+networks:
+  factory-net:
+    external: true

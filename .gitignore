@@ -210,3 +210,8 @@ __marimo__/
 local/
 secrets/
 devcontainer-lock.json
+
+
+# InfluxDB
+influxdb3/
+influxdb3-ui/
