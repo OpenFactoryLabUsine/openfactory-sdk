@@ -3,7 +3,7 @@
 # ==========================================
 # CONFIGURATION
 # ==========================================
-INFLUX_URL="http://172.19.0.13:8181"
+INFLUX_URL="http://172.19.0.6:8181"
 TOKEN="apiv3_HbqdVR_YApDUOYcvIt1e8oFkk3096joxjZcxjHg3etS-u-ktI0_7ia0Kw6bJ0YACi-Q0c0HXMYQZHG2R1wHGJQ"
 SOURCE_DB="ephemeral"
 TARGET_DB="lifetime"
@@ -17,7 +17,7 @@ START_TS=$(date +%s)
 echo "=== RUN ==="
 echo "------------------------------------------------------"
 
-SQL_QUERY="SELECT CAST(arrow_cast(time, 'Int64') AS VARCHAR) AS epoch_ns, \"ASSET_UUID\", \"ID\", \"TAG\", \"TYPE\", CAST(\"VALUE\" AS VARCHAR) AS \"VALUE\", CAST(\"TIMESTAMP\" AS VARCHAR) AS \"TIMESTAMP\" FROM cnc_data WHERE time >= '$START_TIME' AND time < '$END_TIME' ORDER BY time ASC"
+SQL_QUERY="SELECT CAST(arrow_cast(time, 'Int64') AS VARCHAR) AS epoch_ns, \"ASSET_UUID\", \"ID\", \"TAG\", \"TYPE\", CAST(\"VALUE\" AS VARCHAR) AS \"VALUE\", CAST(\"TIMESTAMP\" AS VARCHAR) AS \"TIMESTAMP\" FROM cnc_data WHERE time >= '$START_TIME' AND time < '$END_TIME' ORDER BY time DESC"
 
 curl -s -X POST "$INFLUX_URL/api/v3/query_sql" \
   -H "Authorization: Bearer $TOKEN" \

@@ -17,7 +17,7 @@ START_TS=$(date +%s)
 echo "=== RUN ==="
 echo "------------------------------------------------------"
 
-SQL_QUERY="SELECT \"time\", \"TIMESTAMP\", \"ASSET_UUID\", \"ID\", \"TAG\", \"TYPE\", CAST(\"VALUE\" AS VARCHAR) AS \"VALUE\" FROM cnc_data WHERE time >= '$START_TIME' AND time < '$END_TIME' ORDER BY time ASC"
+SQL_QUERY="SELECT \"time\", \"TIMESTAMP\", \"ASSET_UUID\", \"ID\", \"TAG\", \"TYPE\", CAST(\"VALUE\" AS VARCHAR) AS \"VALUE\" FROM cnc_data WHERE time >= '$START_TIME' AND time < '$END_TIME' ORDER BY time DESC"
 
 curl -s -X POST "$INFLUX_URL/api/v3/query_sql" \
   -H "Authorization: Bearer $TOKEN" \

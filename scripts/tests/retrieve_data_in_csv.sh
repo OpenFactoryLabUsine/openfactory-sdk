@@ -12,7 +12,7 @@ INFLUXDB_COMPOSE_FILE="/usr/local/share/openfactory-sdk/openfactory-infra/docker
 START_TIME="2026-06-01T18:47:00.008Z"
 END_TIME="2026-06-22T18:47:00.008Z"
 
-SQL_QUERY="SELECT time, \"ASSET_UUID\", \"ID\", \"TAG\", \"TYPE\", CAST(\"VALUE\" AS VARCHAR) AS \"VALUE\" FROM cnc_data WHERE time >= '$START_TIME' AND time < '$END_TIME' ORDER BY time ASC"
+SQL_QUERY="SELECT time, \"ASSET_UUID\", \"ID\", \"TAG\", \"TYPE\", CAST(\"VALUE\" AS VARCHAR) AS \"VALUE\" FROM cnc_data WHERE time >= '$START_TIME' AND time < '$END_TIME' ORDER BY time DESC"
 
 # Fichiers temporaires
 touch /tmp/$SOURCE_DB.csv
