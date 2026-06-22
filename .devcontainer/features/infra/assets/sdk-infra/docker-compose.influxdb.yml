@@ -12,7 +12,7 @@ services:
       - --node-id=node0
       - --object-store=file
       - --data-dir=/var/lib/influxdb3/data
-      # - --plugin-dir=/var/lib/influxdb3/plugins
+      - --plugin-dir=/var/lib/influxdb3/plugins
       - --cluster-id=cluster0
       - --license-email=LEHOF1+home@ulaval.ca
       - --license-type=home

@@ -28,7 +28,7 @@
     "ENVIRONMENT": "local",
     "OPENFACTORY_UNS_SCHEMA": "/workspaces/openfactory-sdk/.devcontainer/uns.yml"
   },
-  "forwardPorts": [80, 8888, 8181],
+  "forwardPorts": [80, 8888, 8181, 9092],
   "portsAttributes": {
     "80": {
       "label": "Traefik",
@@ -41,6 +41,10 @@
     "8181": {
       "label": "InfluxDB",
       "onAutoForward": "openBrowser"
+    },
+    "9092": {
+      "label": "Kafka",
+      "onAutoForward": "silent"
     }
   },
   "postCreateCommand": "pip install -e /workspaces/openfactory-sdk[dev]",
