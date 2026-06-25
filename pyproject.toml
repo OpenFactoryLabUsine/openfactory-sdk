@@ -1,6 +1,6 @@
 [project]
 name = "openfactory-sdk"
-version = "0.6.1"
+version = "0.6.2"
 description = "A developer SDK for simulating and deploying apps on a local OpenFactory setup."
 requires-python = ">=3.12"
 dependencies = [
@@ -17,3 +17,6 @@ dev = [
 [build-system]
 requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+exclude = ["influxdb3*", "unscribe*", "influxdb3-ui*"]

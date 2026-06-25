@@ -1,5 +1,6 @@
 {
   "name": "OpenFactory-SDK Dev Container",
+  "initializeCommand": "echo HOST_IP=$(ip route | grep default | awk '{print $3}') > .env",
   "build": {
     "dockerfile": "Dockerfile",
     "context": ".",
@@ -28,7 +29,7 @@
     "ENVIRONMENT": "local",
     "OPENFACTORY_UNS_SCHEMA": "/workspaces/openfactory-sdk/.devcontainer/uns.yml"
   },
-  "forwardPorts": [80, 8888, 8181, 9092],
+  "forwardPorts": [80, 8888, 8181, 9092, 9094],
   "portsAttributes": {
     "80": {
       "label": "Traefik",
@@ -45,6 +46,16 @@
     "9092": {
       "label": "Kafka",
       "onAutoForward": "silent"
+    },
+    "9094": {
+      "label": "Kafka external",
+      "onAutoForward": "silent"
+    },
+    "otherPortsAttributes": {
+      "onAutoForward": "silent"
+    },
+    "settings": {
+      "remote.localPortHost": "allInterfaces"
     }
   },
   "postCreateCommand": "pip install -e /workspaces/openfactory-sdk[dev]",
