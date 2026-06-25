@@ -24,7 +24,7 @@ def print_event(event: dict, prefix: str = "←"):
 
 async def list_equipments():
 
-    url = f"{WS_BASE}/ws/equipments"
+    url = f"{WS_BASE}/equipments"
     print(f"{ts()} Connecting to {url} ...")
 
     async with websockets.connect(url) as ws:
@@ -42,7 +42,7 @@ async def list_equipments():
 
 
 async def stream_equipment(asset_uuid: str, simulate: bool = False, drop: bool = False):
-    url = f"{WS_BASE}/ws/equipments/{asset_uuid}"
+    url = f"{WS_BASE}/equipments/{asset_uuid}"
     print(f"{ts()} Connecting to {url} ...")
 
     got_first_update = False
