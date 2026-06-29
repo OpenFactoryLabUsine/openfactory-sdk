@@ -1,0 +1,22 @@
+services:
+    mssql-db:
+        build:
+            context: .
+            args:
+                MSSQL_SA_PASSWORD: ${SQL_PASSWORD}
+                MSSQL_DB_NAME: ${SQL_DATABASE}
+        image: labusine-db:local
+        container_name: mssql-db
+        environment:
+            - ACCEPT_EULA=Y
+            - MSSQL_PID=Developer
+            - MSSQL_SA_PASSWORD=${SQL_PASSWORD}
+        ports:
+            - "1433:1433"
+        networks:
+            - factory-net
+
+networks:
+    factory-net:
+        external: true
+        name: factory-net
