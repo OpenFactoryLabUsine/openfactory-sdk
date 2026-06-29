@@ -17,7 +17,7 @@ def main():
         time.sleep(15)
 
         print("\n [3/3] Bringing up equipments API...")
-        api_proc = subprocess.Popen(["ofa", "apps", "up", "api.yml"])
+        api_proc = subprocess.Popen(["ofa", "apps", "up", "openfactory-apps/api.yml"])
         processes.append(api_proc)
 
         print("\n Entire CNC virtual setup is up and running!")
