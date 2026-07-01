@@ -3,33 +3,19 @@
 # ==========================================
 # CONFIGURATION
 # ==========================================
-INFLUX_URL="http://172.19.0.6:8181"
-TOKEN="apiv3_ZqO18RWxBTewhtTfq1Y5r-zCOKoTK8W0ZV-UN3WKk9HuwIE0-irpMXobfwprGEF_fh5fYQXgWmP7pXBKyt_sBA"
+INFLUX_URL="http://172.19.0.7:8181"
+TOKEN="apiv3_IpAIoj59qRM7alo6ULE66SG1iO0tuJsCLOAjBOyoyIbqZPQpCLLbKmDAB6PVH0EsRC1GX6J9uqGzw1DzGupHBA"
 SOURCE_DB="ephemeral"
 TARGET_DB="ephemeral"
 
 # Plages horaires au format ISO-8601 (UTC)
 START_TIME="2026-06-01T18:47:00.008Z"
-END_TIME="2026-06-22T18:47:00.008Z"
+END_TIME="2026-06-29T18:47:00.008Z"
 
 # Taille des paquets pour l'écriture (nombre de lignes par envoi HTTP)
 CHUNK_SIZE=20000
 
-# ==========================================
-# MENU INTERACTIF
-# ==========================================
-echo "=== PIPELINE OPTIMISÉ INFLUXDB 3 ==="
-echo "Période : $START_TIME à $END_TIME"
-echo "----------------------------------------"
-echo "1) Mode Haute Fréquence : Tout transférer"
-echo "2) Mode Standard        : Downsampling (1 donnée / 10s)"
-echo "----------------------------------------"
-read -p "Entrez votre choix (1 ou 2) : " CHOIX
-
-if [ "$CHOIX" == "1" ]; then
-    echo -e "\n[⚡] Préparation du flux COMPLET..."
-    SQL_QUERY="SELECT time, \"ASSET_UUID\", \"ID\", \"TAG\", \"TYPE\", \"VALUE\" FROM cnc_data WHERE time >= '$START_TIME' AND time < '$END_TIME'"
-fi
+SQL_QUERY="SELECT time, \"ASSET_UUID\", \"ID\", \"TAG\", \"TYPE\", \"VALUE\", \"TIMESTAMP\" FROM cnc_data WHERE time >= '$START_TIME' AND time < '$END_TIME'"
 
 # Fichiers temporaires
 touch /tmp/influx_write_response.txt
@@ -62,51 +48,52 @@ if [ "$RESPONSE_INFO" != "200" ]; then
     exit 1
 fi
 
+
 # ==========================================
 # STEP 2 : CONVERSION VIA AWK + OFFSET MS DYNAMIQUE
 # ==========================================
-echo "[...] Conversion du flux vers Line Protocol (Moteur awk)..."
+echo "[...] Conversion du flux vers Line Protocol (Moteur Python)..."
 
-awk -F, -v offset_step="1" '
-NR==1 { next } 
-{
-    gsub(/\r|\n/, "", $6) 
-    if ($1 == "") next
-    
-    # 1. Extraction du temps de base
-    year  = substr($1, 1, 4)
-    month = substr($1, 6, 2)
-    day   = substr($1, 9, 2)
-    hour  = substr($1, 12, 2)
-    min   = substr($1, 15, 2)
-    sec   = substr($1, 18, 2)
-    
-    epoch_sec = mktime(year " " month " " day " " hour " " min " " sec)
-    if (epoch_sec <= 0) next
-    
-    # 2. Extraction des nanosecondes d origine (.074029619)
-    dot_pos = index($1, ".")
-    if (dot_pos > 0) {
-        ns_str = substr($1, dot_pos + 1)
-        gsub(/[^0-9]/, "", ns_str)
-    } else {
-        ns_str = "000000000"
-    }
-    while (length(ns_str) < 9) ns_str = ns_str "0"
-    ns_str = substr(ns_str, 1, 9)
+python3 -c '
+import csv, sys, time, re
+from datetime import datetime
 
-    # 3. CONVERSION EN VALEUR NUMÉRIQUE ET AJOUT DE L OFFSET
-    # NR est le numéro de la ligne actuelle. On ajoute (NR * offset_step) en millisecondes
-    # 1 milliseconde = 1 000 000 nanosecondes
-    added_ns = NR * offset_step * 1000000
+offset_step = 1
+added_ms = 0
+
+with open("'"$RAW_RESPONSE"'", "r", encoding="utf-8") as infile, open("'"$PAYLOAD_FILE"'", "w", encoding="utf-8") as outfile:
+    reader = csv.reader(infile)
+    next(reader)  # Skip header
     
-    # On rassemble les secondes et les nanosecondes en un gros chiffre mathématique
-    # puis on ajoute l offset de ms converti en nanosecondes
-    timestamp_ns = (epoch_sec * 1000000000) + ns_str + added_ns
-    
-    # Génération de la ligne Line Protocol
-    printf "cnc_data,ASSET_UUID=%s,ID=%s,TAG=%s,TYPE=%s VALUE=\"%s\" %.0f\n", $2, $3, $4, $5, $6, timestamp_ns
-}' "$RAW_RESPONSE" > "$PAYLOAD_FILE"
+    for row in reader:
+        if len(row) < 7 or not row[0]: continue
+        
+        time_str = row[0]
+        added_ms += offset_step
+        
+        # Extraction basique des ms/ns
+        if "." in time_str:
+            base_time, fractional = time_str.split("Z")[0].split(".")
+            ns_str = (fractional + "000000000")[:9]
+        else:
+            base_time = time_str.split("Z")[0]
+            ns_str = "000000000"
+            
+        # Conversion du temps ISO en epoch (Python 3.7+)
+        epoch_sec = int(datetime.fromisoformat(base_time.replace("Z", "")).timestamp())
+        
+        # Calcul final du timestamp en nanosecondes
+        timestamp_ns = (epoch_sec * 1000000000) + int(ns_str) + (added_ms * 1000000)
+        
+        # Nettoyage de la valeur (enlève les sauts de ligne qui cassent le Line Protocol)
+        val = row[5].replace("\n", "").replace("\r", "")
+        # Echappement des guillemets pour le Line Protocol InfluxDB
+        val = val.replace("\"", "\\\"")
+        
+        # Formatage de la ligne
+        lp_line = f"cnc_data,ASSET_UUID={row[1]},ID={row[2]},TAG={row[3]},TYPE={row[4]} VALUE=\"{val}\",TIMESTAMP=\"{row[6]}\" {timestamp_ns}\n"
+        outfile.write(lp_line)
+'
 
 LINE_COUNT=$(wc -l < "$PAYLOAD_FILE")
 echo "[+] $LINE_COUNT lignes prêtes pour l'injection."
