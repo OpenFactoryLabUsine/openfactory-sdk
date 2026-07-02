@@ -53,23 +53,19 @@ services:
     networks:
       - factory-net
 
-  # telegraf:
-  #     image: telegraf:1.39.0
-  #     container_name: telegraf
-  #     command: --config /etc/telegraf/telegraf.conf --once
-  #     networks:
-  #       - factory-net
-  #     volumes:
-  #       - type: bind
-  #         source: ../telegraf/telegraf.conf
-  #         target: /etc/telegraf/telegraf.conf
-  #         read_only: true
-  #       - type: bind
-  #         source: /tmp/influx_raw.csv
-  #         target: /tmp/influx_raw.csv
-  #         read_only: false
-  #     depends_on:
-  #       - influxdb3-enterprise
+  telegraf:
+      image: telegraf:1.39.0
+      container_name: telegraf
+      command: --config /etc/telegraf/telegraf.conf
+      networks:
+        - factory-net
+      volumes:
+        - type: bind
+          source: ../telegraf/telegraf.conf
+          target: /etc/telegraf/telegraf.conf
+          read_only: true
+      depends_on:
+        - influxdb3-enterprise
 
 
 networks:

@@ -15,7 +15,7 @@ END_TIME="2026-06-29T18:47:00.008Z"
 # Taille des paquets pour l'écriture (nombre de lignes par envoi HTTP)
 CHUNK_SIZE=20000
 
-SQL_QUERY="SELECT time, \"ASSET_UUID\", \"ID\", \"TAG\", \"TYPE\", \"VALUE\", \"TIMESTAMP\" FROM cnc_data WHERE time >= '$START_TIME' AND time < '$END_TIME'"
+SQL_QUERY="SELECT time, \"ASSET_UUID\", \"ID\", \"TAG\", \"TYPE\", \"VALUE\", \"TIMESTAMP\" FROM cnc_data WHERE \"ASSET_UUID\" = 'DUSTTRAK' AND time >= '$START_TIME' AND time < '$END_TIME'"
 
 # Fichiers temporaires
 touch /tmp/influx_write_response.txt

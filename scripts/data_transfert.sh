@@ -3,7 +3,7 @@
 # ==========================================
 # CONFIGURATION
 # ==========================================
-INFLUX_URL="http://172.19.0.7:8181"
+INFLUX_URL="http://172.19.0.6:8181"
 TOKEN="apiv3_IpAIoj59qRM7alo6ULE66SG1iO0tuJsCLOAjBOyoyIbqZPQpCLLbKmDAB6PVH0EsRC1GX6J9uqGzw1DzGupHBA"
 SOURCE_DB="ephemeral"
 TARGET_DB="lifetime"
@@ -17,7 +17,7 @@ START_TS=$(date +%s)
 echo "=== RUN ==="
 echo "------------------------------------------------------"
 
-SQL_QUERY="SELECT CAST(arrow_cast(time, 'Int64') AS VARCHAR) AS epoch_ns, \"ASSET_UUID\", \"ID\", \"TAG\", \"TYPE\", CAST(\"VALUE\" AS VARCHAR) AS \"VALUE\", CAST(\"TIMESTAMP\" AS VARCHAR) AS \"TIMESTAMP\" FROM only_cnc_data WHERE \"TAG\" NOT IN ('Application.License', 'Method', 'Method.Command', 'Library.License') AND \"TIMESTAMP\" >= '$START_TIME' AND \"TIMESTAMP\" <= '$END_TIME'"
+SQL_QUERY="SELECT CAST(arrow_cast(time, 'Int64') AS VARCHAR) AS epoch_ns, \"ASSET_UUID\", \"ID\", \"TAG\", \"TYPE\", CAST(\"VALUE\" AS VARCHAR) AS \"VALUE\", CAST(\"TIMESTAMP\" AS VARCHAR) AS \"TIMESTAMP\" FROM cnc_data WHERE \"ASSET_UUID\" = 'CNC' AND \"TAG\" NOT IN ('Application.License', 'Method', 'Method.Command', 'Library.License') AND \"TIMESTAMP\" >= '$START_TIME' AND \"TIMESTAMP\" <= '$END_TIME'"
 
 curl -s -X POST "$INFLUX_URL/api/v3/query_sql" \
   -H "Authorization: Bearer $TOKEN" \
@@ -27,7 +27,7 @@ curl -s -X POST "$INFLUX_URL/api/v3/query_sql" \
       \"format\": \"jsonl\",
       \"q\": \"${SQL_QUERY//\"/\\\"}\"
     }" | jq -r '
-      "cnc_data,ASSET_UUID=\(.ASSET_UUID),ID=\(.ID),TAG=\(.TAG),TYPE=\(.TYPE) VALUE=\"\(.VALUE)\",TIMESTAMP=\"\(.TIMESTAMP)\" \(.epoch_ns)"
+      "only_cnc_data,ASSET_UUID=\(.ASSET_UUID),ID=\(.ID),TAG=\(.TAG),TYPE=\(.TYPE) VALUE=\"\(.VALUE)\",TIMESTAMP=\"\(.TIMESTAMP)\" \(.epoch_ns)"
     ' | split -l $CHUNK_SIZE --filter="curl -s -X POST '$INFLUX_URL/api/v3/write_lp?db=$TARGET_DB&precision=ns' -H 'Authorization: Bearer $TOKEN' -H 'Content-Type: text/plain; charset=utf-8' --data-binary @-"
 
 
