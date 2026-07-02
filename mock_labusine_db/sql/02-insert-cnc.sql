@@ -90,147 +90,147 @@ DECLARE @TypeDimensionZ INT = (SELECT Id FROM Type WHERE Nom = 'DimensionZ');
 
 
 -- Succion state for CNC_Succion_zone1
-INSERT INTO Variable (EquipmentId, Nom, OpenFactoryVariableId, TypeId) VALUES ('CNC_Succion_zone1', 'Etat', '1', @TypeEtat);
+INSERT INTO Variable (EquipmentId, Nom, DataItemId, TypeId) VALUES ('CNC_Succion_zone1', 'Etat', '1', @TypeEtat);
 DECLARE @VarEtatZone1 INT = SCOPE_IDENTITY();
 INSERT INTO Data (VariableId, Value) VALUES (@VarEtatZone1, 'false');
 
 -- Succion state for CNC_Succion_zone2
-INSERT INTO Variable (EquipmentId, Nom, OpenFactoryVariableId, TypeId) VALUES ('CNC_Succion_zone2', 'Etat', '2', @TypeEtat);
+INSERT INTO Variable (EquipmentId, Nom, DataItemId, TypeId) VALUES ('CNC_Succion_zone2', 'Etat', '2', @TypeEtat);
 DECLARE @VarEtatZone2 INT = SCOPE_IDENTITY();
 INSERT INTO Data (VariableId, Value) VALUES (@VarEtatZone2, 'false');
 
 -- Succion state for CNC_Succion_zone3
-INSERT INTO Variable (EquipmentId, Nom, OpenFactoryVariableId, TypeId) VALUES ('CNC_Succion_zone3', 'Etat', '3', @TypeEtat);
+INSERT INTO Variable (EquipmentId, Nom, DataItemId, TypeId) VALUES ('CNC_Succion_zone3', 'Etat', '3', @TypeEtat);
 DECLARE @VarEtatZone3 INT = SCOPE_IDENTITY();
 INSERT INTO Data (VariableId, Value) VALUES (@VarEtatZone3, 'false');
 
 -- Succion state for CNC_Succion_zone4
-INSERT INTO Variable (EquipmentId, Nom, OpenFactoryVariableId, TypeId) VALUES ('CNC_Succion_zone4', 'Etat', '4', @TypeEtat);
+INSERT INTO Variable (EquipmentId, Nom, DataItemId, TypeId) VALUES ('CNC_Succion_zone4', 'Etat', '4', @TypeEtat);
 DECLARE @VarEtatZone4 INT = SCOPE_IDENTITY();
 INSERT INTO Data (VariableId, Value) VALUES (@VarEtatZone4, 'false');
 
 -- Succion state for CNC_Succion_zone5
-INSERT INTO Variable (EquipmentId, Nom, OpenFactoryVariableId, TypeId) VALUES ('CNC_Succion_zone5', 'Etat', '5', @TypeEtat);
+INSERT INTO Variable (EquipmentId, Nom, DataItemId, TypeId) VALUES ('CNC_Succion_zone5', 'Etat', '5', @TypeEtat);
 DECLARE @VarEtatZone5 INT = SCOPE_IDENTITY();
 INSERT INTO Data (VariableId, Value) VALUES (@VarEtatZone5, 'false');
 
 -- Succion state for CNC_Succion_zone6
-INSERT INTO Variable (EquipmentId, Nom, OpenFactoryVariableId, TypeId) VALUES ('CNC_Succion_zone6', 'Etat', '6', @TypeEtat);
+INSERT INTO Variable (EquipmentId, Nom, DataItemId, TypeId) VALUES ('CNC_Succion_zone6', 'Etat', '6', @TypeEtat);
 DECLARE @VarEtatZone6 INT = SCOPE_IDENTITY();
 INSERT INTO Data (VariableId, Value) VALUES (@VarEtatZone6, 'false');
 
 
 -- Succion zone position CNC_Succion_zone1
-INSERT INTO Variable (EquipmentId, Nom, OpenFactoryVariableId, TypeId) VALUES ('CNC_Succion_zone1', 'PositionX', '7', @TypePositionX);
+INSERT INTO Variable (EquipmentId, Nom, DataItemId, TypeId) VALUES ('CNC_Succion_zone1', 'PositionX', '7', @TypePositionX);
 DECLARE @VarPositionXZone1 INT = SCOPE_IDENTITY();
 INSERT INTO Data (VariableId, Value) VALUES (@VarPositionXZone1, '0.0');
 
-INSERT INTO Variable (EquipmentId, Nom, OpenFactoryVariableId, TypeId) VALUES ('CNC_Succion_zone1', 'PositionY', '8', @TypePositionY);
+INSERT INTO Variable (EquipmentId, Nom, DataItemId, TypeId) VALUES ('CNC_Succion_zone1', 'PositionY', '8', @TypePositionY);
 DECLARE @VarPositionYZone1 INT = SCOPE_IDENTITY();
 INSERT INTO Data (VariableId, Value) VALUES (@VarPositionYZone1, '0.0');
 
 
 -- Succion zone position CNC_Succion_zone2
-INSERT INTO Variable (EquipmentId, Nom, OpenFactoryVariableId, TypeId) VALUES ('CNC_Succion_zone2', 'PositionX', '9', @TypePositionX);
+INSERT INTO Variable (EquipmentId, Nom, DataItemId, TypeId) VALUES ('CNC_Succion_zone2', 'PositionX', '9', @TypePositionX);
 DECLARE @VarPositionXZone2 INT = SCOPE_IDENTITY();
 INSERT INTO Data (VariableId, Value) VALUES (@VarPositionXZone2, '762.0');
 
-INSERT INTO Variable (EquipmentId, Nom, OpenFactoryVariableId, TypeId) VALUES ('CNC_Succion_zone2', 'PositionY', '10', @TypePositionY);
+INSERT INTO Variable (EquipmentId, Nom, DataItemId, TypeId) VALUES ('CNC_Succion_zone2', 'PositionY', '10', @TypePositionY);
 DECLARE @VarPositionYZone2 INT = SCOPE_IDENTITY();
 INSERT INTO Data (VariableId, Value) VALUES (@VarPositionYZone2, '0.0');
 
 
 -- Succion zone position CNC_Succion_zone3
-INSERT INTO Variable (EquipmentId, Nom, OpenFactoryVariableId, TypeId) VALUES ('CNC_Succion_zone3', 'PositionX', '11', @TypePositionX);
+INSERT INTO Variable (EquipmentId, Nom, DataItemId, TypeId) VALUES ('CNC_Succion_zone3', 'PositionX', '11', @TypePositionX);
 DECLARE @VarPositionXZone3 INT = SCOPE_IDENTITY();
 INSERT INTO Data (VariableId, Value) VALUES (@VarPositionXZone3, '1219.2');
 
-INSERT INTO Variable (EquipmentId, Nom, OpenFactoryVariableId, TypeId) VALUES ('CNC_Succion_zone3', 'PositionY', '12', @TypePositionY);
+INSERT INTO Variable (EquipmentId, Nom, DataItemId, TypeId) VALUES ('CNC_Succion_zone3', 'PositionY', '12', @TypePositionY);
 DECLARE @VarPositionYZone3 INT = SCOPE_IDENTITY();
 INSERT INTO Data (VariableId, Value) VALUES (@VarPositionYZone3, '0.0');
 
 
 -- Succion zone position CNC_Succion_zone4
-INSERT INTO Variable (EquipmentId, Nom, OpenFactoryVariableId, TypeId) VALUES ('CNC_Succion_zone4', 'PositionX', '13', @TypePositionX);
+INSERT INTO Variable (EquipmentId, Nom, DataItemId, TypeId) VALUES ('CNC_Succion_zone4', 'PositionX', '13', @TypePositionX);
 DECLARE @VarPositionXZone4 INT = SCOPE_IDENTITY();
 INSERT INTO Data (VariableId, Value) VALUES (@VarPositionXZone4, '0.0');
 
-INSERT INTO Variable (EquipmentId, Nom, OpenFactoryVariableId, TypeId) VALUES ('CNC_Succion_zone4', 'PositionY', '14', @TypePositionY);
+INSERT INTO Variable (EquipmentId, Nom, DataItemId, TypeId) VALUES ('CNC_Succion_zone4', 'PositionY', '14', @TypePositionY);
 DECLARE @VarPositionYZone4 INT = SCOPE_IDENTITY();
 INSERT INTO Data (VariableId, Value) VALUES (@VarPositionYZone4, '1524.0');
 
 
 -- Succion zone position CNC_Succion_zone5
-INSERT INTO Variable (EquipmentId, Nom, OpenFactoryVariableId, TypeId) VALUES ('CNC_Succion_zone5', 'PositionX', '15', @TypePositionX);
+INSERT INTO Variable (EquipmentId, Nom, DataItemId, TypeId) VALUES ('CNC_Succion_zone5', 'PositionX', '15', @TypePositionX);
 DECLARE @VarPositionXZone5 INT = SCOPE_IDENTITY();
 INSERT INTO Data (VariableId, Value) VALUES (@VarPositionXZone5, '1219.2');
 
-INSERT INTO Variable (EquipmentId, Nom, OpenFactoryVariableId, TypeId) VALUES ('CNC_Succion_zone5', 'PositionY', '16', @TypePositionY);
+INSERT INTO Variable (EquipmentId, Nom, DataItemId, TypeId) VALUES ('CNC_Succion_zone5', 'PositionY', '16', @TypePositionY);
 DECLARE @VarPositionYZone5 INT = SCOPE_IDENTITY();
 INSERT INTO Data (VariableId, Value) VALUES (@VarPositionYZone5, '1524.0');
 
 
 -- Succion zone position CNC_Succion_zone6
-INSERT INTO Variable (EquipmentId, Nom, OpenFactoryVariableId, TypeId) VALUES ('CNC_Succion_zone6', 'PositionX', '17', @TypePositionX);
+INSERT INTO Variable (EquipmentId, Nom, DataItemId, TypeId) VALUES ('CNC_Succion_zone6', 'PositionX', '17', @TypePositionX);
 DECLARE @VarPositionXZone6 INT = SCOPE_IDENTITY();
 INSERT INTO Data (VariableId, Value) VALUES (@VarPositionXZone6, '0.0');
 
-INSERT INTO Variable (EquipmentId, Nom, OpenFactoryVariableId, TypeId) VALUES ('CNC_Succion_zone6', 'PositionY', '18', @TypePositionY);
+INSERT INTO Variable (EquipmentId, Nom, DataItemId, TypeId) VALUES ('CNC_Succion_zone6', 'PositionY', '18', @TypePositionY);
 DECLARE @VarPositionYZone6 INT = SCOPE_IDENTITY();
 INSERT INTO Data (VariableId, Value) VALUES (@VarPositionYZone6, '2438.4');
 
 
 -- Succion dimension for CNC_Succion_zone1
-INSERT INTO Variable (EquipmentId, Nom, OpenFactoryVariableId, TypeId) VALUES ('CNC_Succion_zone1', 'DimensionX', '19', @TypeDimensionX);
+INSERT INTO Variable (EquipmentId, Nom, DataItemId, TypeId) VALUES ('CNC_Succion_zone1', 'DimensionX', '19', @TypeDimensionX);
 DECLARE @VarDimensionXZone1 INT = SCOPE_IDENTITY();
 INSERT INTO Data (VariableId, Value) VALUES (@VarDimensionXZone1, '762');
 
-INSERT INTO Variable (EquipmentId, Nom, OpenFactoryVariableId, TypeId) VALUES ('CNC_Succion_zone1', 'DimensionY', '20', @TypeDimensionY);
+INSERT INTO Variable (EquipmentId, Nom, DataItemId, TypeId) VALUES ('CNC_Succion_zone1', 'DimensionY', '20', @TypeDimensionY);
 DECLARE @VarDimensionYZone1 INT = SCOPE_IDENTITY();
 INSERT INTO Data (VariableId, Value) VALUES (@VarDimensionYZone1, '1524');
 
 -- Succion dimension for CNC_Succion_zone2
-INSERT INTO Variable (EquipmentId, Nom, OpenFactoryVariableId, TypeId) VALUES ('CNC_Succion_zone2', 'DimensionX', '21', @TypeDimensionX);
+INSERT INTO Variable (EquipmentId, Nom, DataItemId, TypeId) VALUES ('CNC_Succion_zone2', 'DimensionX', '21', @TypeDimensionX);
 DECLARE @VarDimensionXZone2 INT = SCOPE_IDENTITY();
 INSERT INTO Data (VariableId, Value) VALUES (@VarDimensionXZone2, '457.2');
 
-INSERT INTO Variable (EquipmentId, Nom, OpenFactoryVariableId, TypeId) VALUES ('CNC_Succion_zone2', 'DimensionY', '22', @TypeDimensionY);
+INSERT INTO Variable (EquipmentId, Nom, DataItemId, TypeId) VALUES ('CNC_Succion_zone2', 'DimensionY', '22', @TypeDimensionY);
 DECLARE @VarDimensionYZone2 INT = SCOPE_IDENTITY();
 INSERT INTO Data (VariableId, Value) VALUES (@VarDimensionYZone2, '1524');
 
 -- Succion dimension for CNC_Succion_zone3
-INSERT INTO Variable (EquipmentId, Nom, OpenFactoryVariableId, TypeId) VALUES ('CNC_Succion_zone3', 'DimensionX', '23', @TypeDimensionX);
+INSERT INTO Variable (EquipmentId, Nom, DataItemId, TypeId) VALUES ('CNC_Succion_zone3', 'DimensionX', '23', @TypeDimensionX);
 DECLARE @VarDimensionXZone3 INT = SCOPE_IDENTITY();
 INSERT INTO Data (VariableId, Value) VALUES (@VarDimensionXZone3, '304.8');
 
-INSERT INTO Variable (EquipmentId, Nom, OpenFactoryVariableId, TypeId) VALUES ('CNC_Succion_zone3', 'DimensionY', '24', @TypeDimensionY);
+INSERT INTO Variable (EquipmentId, Nom, DataItemId, TypeId) VALUES ('CNC_Succion_zone3', 'DimensionY', '24', @TypeDimensionY);
 DECLARE @VarDimensionYZone3 INT = SCOPE_IDENTITY();
 INSERT INTO Data (VariableId, Value) VALUES (@VarDimensionYZone3, '1524');
 
 -- Succion dimension for CNC_Succion_zone4
-INSERT INTO Variable (EquipmentId, Nom, OpenFactoryVariableId, TypeId) VALUES ('CNC_Succion_zone4', 'DimensionX', '25', @TypeDimensionX);
+INSERT INTO Variable (EquipmentId, Nom, DataItemId, TypeId) VALUES ('CNC_Succion_zone4', 'DimensionX', '25', @TypeDimensionX);
 DECLARE @VarDimensionXZone4 INT = SCOPE_IDENTITY();
 INSERT INTO Data (VariableId, Value) VALUES (@VarDimensionXZone4, '1219.2');
 
-INSERT INTO Variable (EquipmentId, Nom, OpenFactoryVariableId, TypeId) VALUES ('CNC_Succion_zone4', 'DimensionY', '26', @TypeDimensionY);
+INSERT INTO Variable (EquipmentId, Nom, DataItemId, TypeId) VALUES ('CNC_Succion_zone4', 'DimensionY', '26', @TypeDimensionY);
 DECLARE @VarDimensionYZone4 INT = SCOPE_IDENTITY();
 INSERT INTO Data (VariableId, Value) VALUES (@VarDimensionYZone4, '914.4');
 
 -- Succion dimension for CNC_Succion_zone5
-INSERT INTO Variable (EquipmentId, Nom, OpenFactoryVariableId, TypeId) VALUES ('CNC_Succion_zone5', 'DimensionX', '27', @TypeDimensionX);
+INSERT INTO Variable (EquipmentId, Nom, DataItemId, TypeId) VALUES ('CNC_Succion_zone5', 'DimensionX', '27', @TypeDimensionX);
 DECLARE @VarDimensionXZone5 INT = SCOPE_IDENTITY();
 INSERT INTO Data (VariableId, Value) VALUES (@VarDimensionXZone5, '304.8');
 
-INSERT INTO Variable (EquipmentId, Nom, OpenFactoryVariableId, TypeId) VALUES ('CNC_Succion_zone5', 'DimensionY', '28', @TypeDimensionY);
+INSERT INTO Variable (EquipmentId, Nom, DataItemId, TypeId) VALUES ('CNC_Succion_zone5', 'DimensionY', '28', @TypeDimensionY);
 DECLARE @VarDimensionYZone5 INT = SCOPE_IDENTITY();
 INSERT INTO Data (VariableId, Value) VALUES (@VarDimensionYZone5, '914.4');
 
 -- Succion dimension for CNC_Succion_zone6
-INSERT INTO Variable (EquipmentId, Nom, OpenFactoryVariableId, TypeId) VALUES ('CNC_Succion_zone6', 'DimensionX', '29', @TypeDimensionX);
+INSERT INTO Variable (EquipmentId, Nom, DataItemId, TypeId) VALUES ('CNC_Succion_zone6', 'DimensionX', '29', @TypeDimensionX);
 DECLARE @VarDimensionXZone6 INT = SCOPE_IDENTITY();
 INSERT INTO Data (VariableId, Value) VALUES (@VarDimensionXZone6, '1524');
 
-INSERT INTO Variable (EquipmentId, Nom, OpenFactoryVariableId, TypeId) VALUES ('CNC_Succion_zone6', 'DimensionY', '30', @TypeDimensionY);
+INSERT INTO Variable (EquipmentId, Nom, DataItemId, TypeId) VALUES ('CNC_Succion_zone6', 'DimensionY', '30', @TypeDimensionY);
 DECLARE @VarDimensionYZone6 INT = SCOPE_IDENTITY();
 INSERT INTO Data (VariableId, Value) VALUES (@VarDimensionYZone6, '609.6');
 
@@ -238,28 +238,28 @@ INSERT INTO Data (VariableId, Value) VALUES (@VarDimensionYZone6, '609.6');
 
 
 -- Transform for CNC_Structure
-INSERT INTO Variable (EquipmentId, Nom, OpenFactoryVariableId, TypeId)
+INSERT INTO Variable (EquipmentId, Nom, DataItemId, TypeId)
 VALUES ('CNC_Structure', 'PositionX', '25', @TypePositionX);
 DECLARE @VarPositionXStructure INT = SCOPE_IDENTITY();
 
 INSERT INTO Data (VariableId, Value)
 VALUES (@VarPositionXStructure, '3.65');
 --
-INSERT INTO Variable (EquipmentId, Nom, OpenFactoryVariableId, TypeId)
+INSERT INTO Variable (EquipmentId, Nom, DataItemId, TypeId)
 VALUES ('CNC_Structure', 'PositionY', '26', @TypePositionY);
 DECLARE @VarPositionYStructure INT = SCOPE_IDENTITY();
 
 INSERT INTO Data (VariableId, Value)
 VALUES (@VarPositionYStructure, '0.8');
 --
-INSERT INTO Variable (EquipmentId, Nom, OpenFactoryVariableId, TypeId)
+INSERT INTO Variable (EquipmentId, Nom, DataItemId, TypeId)
 VALUES ('CNC_Structure', 'PositionZ', '27', @TypePositionZ);
 DECLARE @VarPositionZStructure INT = SCOPE_IDENTITY();
 
 INSERT INTO Data (VariableId, Value)
 VALUES (@VarPositionZStructure, '5.12');
 --
-INSERT INTO Variable (EquipmentId, Nom, OpenFactoryVariableId, TypeId)
+INSERT INTO Variable (EquipmentId, Nom, DataItemId, TypeId)
 VALUES ('CNC_Structure', 'RotationY', '28', @TypeRotationY);
 DECLARE @VarRotationYStructure INT = SCOPE_IDENTITY();
 
@@ -267,7 +267,7 @@ INSERT INTO Data (VariableId, Value)
 VALUES (@VarRotationYStructure, '270');
 
 -- Transform for CNC_Bridge
-INSERT INTO Variable (EquipmentId, Nom, OpenFactoryVariableId, TypeId)
+INSERT INTO Variable (EquipmentId, Nom, DataItemId, TypeId)
 VALUES ('CNC_Bridge', 'PositionZ', '29', @TypePositionZ);
 DECLARE @VarPositionZBridge INT = SCOPE_IDENTITY();
 
@@ -275,7 +275,7 @@ INSERT INTO Data (VariableId, Value)
 VALUES (@VarPositionZBridge, '-1000.0');
 
 -- Transform for CNC_Rack
-INSERT INTO Variable (EquipmentId, Nom, OpenFactoryVariableId, TypeId)
+INSERT INTO Variable (EquipmentId, Nom, DataItemId, TypeId)
 VALUES ('CNC_Rack', 'PositionX', '30', @TypePositionX);
 DECLARE @VarPositionXRack INT = SCOPE_IDENTITY();
 
@@ -283,7 +283,7 @@ INSERT INTO Data (VariableId, Value)
 VALUES (@VarPositionXRack, '-500.0');
 
 -- Transform for CNC_Spindle
-INSERT INTO Variable (EquipmentId, Nom, OpenFactoryVariableId, TypeId)
+INSERT INTO Variable (EquipmentId, Nom, DataItemId, TypeId)
 VALUES ('CNC_Spindle', 'PositionY', '31', @TypePositionY);
 DECLARE @VarPositionYSpindle INT = SCOPE_IDENTITY();
 
@@ -291,7 +291,7 @@ INSERT INTO Data (VariableId, Value)
 VALUES (@VarPositionYSpindle, '-280.0');
 
 -- Speed for CNC_Spindle
-INSERT INTO Variable (EquipmentId, Nom, OpenFactoryVariableId, TypeId)
+INSERT INTO Variable (EquipmentId, Nom, DataItemId, TypeId)
 VALUES ('CNC_Spindle', 'Speed', '32', @TypeSpeed);
 DECLARE @VarSpeedSpindle INT = SCOPE_IDENTITY();
 
