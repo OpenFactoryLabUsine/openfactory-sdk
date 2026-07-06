@@ -21,8 +21,15 @@ KAFKA_COMPOSE_FILE="${SDK_PATH}/openfactory-infra/docker-compose.yml"
 TRAEFIK_COMPOSE_FILE="${SDK_PATH}/openfactory-infra/docker-compose.traefik.yml"
 FAN_OUT_LAYER_COMPOSE_FILE="${SDK_PATH}/openfactory-fanoutlayer/docker-compose.yml"
 INFLUXDB_COMPOSE_FILE="${SDK_PATH}/openfactory-infra/docker-compose.influxdb.yml"
+FAN_OUT_LAYER_COMPOSE_FILE="${SDK_PATH}/openfactory-infra/docker-compose.nats.yml"
+PROMETHEUS_COMPOSE_FILE="${SDK_PATH}/openfactory-infra/docker-compose.prometheus.yml"
 
-# Tear down fan-out layer first
+# Tear down OpenFactory Apps
+echo "🏭 Removing OpenFactory Apps"
+ofa apps down ${SDK_PATH}/openfactory-infra/monitoring/
+ofa apps down ${SDK_PATH}/openfactory-infra/fanoutlayer
+
+# Tear down fan-out layer
 echo "🐳  Stopping OpenFactory fan-out layer..."
 docker compose -f "$FAN_OUT_LAYER_COMPOSE_FILE" -p fan-out-layer down -v
 
@@ -33,6 +40,10 @@ docker compose -f "$INFLUXDB_COMPOSE_FILE" -p influxdb down -v
 # Tear down Traefik
 echo "🐳  Stopping Traefik..."
 docker compose -f "$TRAEFIK_COMPOSE_FILE" -p traefik down -v
+
+# Tear down Prometheus
+echo "🐳  Stopping Prometheus..."
+docker compose -f "$PROMETHEUS_COMPOSE_FILE" -p prometheus down -v
 
 # Tear down Kafka cluster
 echo "🐳  Stopping Kafka cluster..."
