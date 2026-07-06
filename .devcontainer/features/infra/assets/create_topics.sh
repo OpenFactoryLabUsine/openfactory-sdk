@@ -26,6 +26,7 @@ for i in $(seq 0 $((NUM_TOPICS - 1))); do
     PARTITIONS=$(yq -r ".topics[$i].partitions" "$TOPIC_FILE")
     REPLICATION=$(yq -r ".topics[$i].replication" "$TOPIC_FILE")
     CLEANUP=$(yq -r ".topics[$i].cleanup" "$TOPIC_FILE")
+    RETENTION_BYTES=$(yq -r ".topics[$i].retention_bytes // \"\"" "$TOPIC_FILE")
     COMMENT=$(yq -r ".topics[$i].comment" "$TOPIC_FILE")
 
     echo "Processing topic: $NAME ($COMMENT)"
@@ -37,6 +38,11 @@ for i in $(seq 0 $((NUM_TOPICS - 1))); do
       --replication-factor "$REPLICATION" \
       --config cleanup.policy="$CLEANUP" \
       --if-not-exists >/dev/null 2>&1
+
+        if [[ -n "$RETENTION_BYTES" ]]; then
+            docker exec broker kafka-configs --bootstrap-server $BOOTSTRAP_SERVER --entity-type topics --entity-name "$NAME" --alter \
+                --add-config "cleanup.policy=$CLEANUP,retention.bytes=$RETENTION_BYTES" >/dev/null 2>&1
+        fi
 
     # Get actual topic info from Kafka
     INFO=$(docker exec broker kafka-topics --bootstrap-server $BOOTSTRAP_SERVER --describe --topic "$NAME" 2>/dev/null)
