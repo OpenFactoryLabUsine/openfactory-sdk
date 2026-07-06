@@ -60,8 +60,6 @@ echo "⚙️  Setting up Kafka topics ..."
 echo "⚙️  Deploying OpenFactory stream processing topology ..."
 ofa setup-kafka --ksqldb-server "${KSQLDB_URL}"
 
-echo " Setting up KSQLDB Streams ..."
-/usr/local/bin/create_ksqldb_streams.sh
 
 # Setup OpenFactory Fan-out Layer
 echo "🐳  Deploying OpenFactory fan-out layer ..."

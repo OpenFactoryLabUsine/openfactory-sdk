@@ -26,7 +26,7 @@ mkdir -p "/usr/local/share/openfactory-sdk/openfactory-infra"
 cp -r "$(dirname "$0")/assets/sdk-infra/." "/usr/local/share/openfactory-sdk/openfactory-infra/"
 
 echo "📁 Copying helper scripts..."
-for script in spinup.sh teardown.sh create_topics.sh openfactory-sdk-startup.sh topics.yml create_ksqldb_streams.sh; do
+for script in spinup.sh teardown.sh create_topics.sh openfactory-sdk-startup.sh topics.yml; do
   cp "$(dirname "$0")/assets/$script" /usr/local/bin/$script
   chmod +x /usr/local/bin/$script
 done
