@@ -1,4 +1,3 @@
-
 import asyncio
 import json
 import argparse
@@ -8,7 +7,6 @@ from datetime import datetime
 
 API_HOST = "localhost/equipments-api"
 WS_BASE = f"ws://{API_HOST}"
-
 
 def ts():
     return datetime.now().strftime("%H:%M:%S")
@@ -21,77 +19,50 @@ def print_event(event: dict, prefix: str = "←"):
     print(f"\n{ts()} {prefix} [{kind}]")
     print(pretty(event))
 
-
 async def list_equipments():
-
     url = f"{WS_BASE}/equipments"
     print(f"{ts()} Connecting to {url} ...")
 
     async with websockets.connect(url) as ws:
-        print(f"{ts()} Connected. Waiting for equipments_list ...")
         async for raw in ws:
             event = json.loads(raw)
             print_event(event)
             if event.get("event") == "equipments_list":
-                equipments = event.get("equipments", [])
-                print(f"\n{ts()} {len(equipments)} equipment(s) known:")
-                for eq in equipments:
-                    print(f"   {eq['asset_uuid']}  vars={list(eq.get('variables', {}).keys())}")
                 break
-    print(f"\n{ts()} Done.")
 
-
-async def stream_equipment(asset_uuid: str, simulate: bool = False, drop: bool = False):
+async def stream_equipment(asset_uuid: str, method: str = None, params: str = None):
     url = f"{WS_BASE}/equipments/{asset_uuid}"
     print(f"{ts()} Connecting to {url} ...")
 
-    got_first_update = False
-
     async with websockets.connect(url) as ws:
         print(f"{ts()} Connected. Streaming {asset_uuid}\n")
+
+        if method:
+            payload = {"method": method, "params": json.loads(params) if params else {}}
+            print(f"\n{ts()} → [{method}] sending {json.dumps(payload)} ...")
+            await ws.send(json.dumps(payload))
 
         async for raw in ws:
             event = json.loads(raw)
             print_event(event)
 
-            if event.get("event") == "equipment_update" and not got_first_update:
-                got_first_update = True
-
-                if simulate:
-                    msg = {
-                        "method": "simulation_mode",
-                        "params": {"name": "simulationMode", "args": True}
-                    }
-                    print(f"\n{ts()} → [simulation_mode] sending ...")
-                    await ws.send(json.dumps(msg))
-
-                if drop:
-                    msg = {"method": "drop_connection", "params": {}}
-                    print(f"\n{ts()} → [drop_connection] sending ...")
-                    await ws.send(json.dumps(msg))
-
-            if event.get("event") == "connection_dropped":
-                print(f"\n{ts()} Connection dropped by server. Exiting.")
-                break
-
-            if event.get("event") == "error":
-                print(f"\n{ts()} Server error: {event.get('message')}")
+            if event.get("event") in ["connection_dropped", "error"]:
                 break
 
 async def main():
     parser = argparse.ArgumentParser(description="Test openfactory-equipment-api WebSocket endpoints.")
-    parser.add_argument("asset_uuid", nargs="?", help="Asset UUID to stream (omit to list all equipments)")
-    parser.add_argument("--simulate", action="store_true", help="Toggle simulation mode after first update")
-    parser.add_argument("--drop", action="store_true", help="Send drop_connection after first update")
-    parser.add_argument("--host", default=API_HOST, help=f"API hostname (default: {API_HOST})")
+    parser.add_argument("asset_uuid", nargs="?", help="Asset UUID to stream")
+    parser.add_argument("--host", default=API_HOST, help=f"API hostname")
+    parser.add_argument("--method", help="Method to call (e.g., simulation_mode)")
+    parser.add_argument("--params", help="JSON string of parameters (e.g., '{\"name\": \"simulationMode\", \"args\": true}')")
+    
     args = parser.parse_args()
-
     global WS_BASE
     WS_BASE = f"ws://{args.host}"
 
     try:
         if args.asset_uuid:
-            await stream_equipment(args.asset_uuid, simulate=args.simulate, drop=args.drop)
+            await stream_equipment(args.asset_uuid, method=args.method, params=args.params)
         else:
             await list_equipments()
     except KeyboardInterrupt:
