@@ -3,7 +3,7 @@ GO
 
 INSERT INTO EquipmentType (Nom, Description)
 VALUES
-('DustSensor', 'Dust sensor device for measuring particulate matter.');
+('Aerosol Monitor', 'Data-logging, light-scattering laser photometer designed to provide continuous, near-reference measurement of particulate matter concentrations.');
 
 INSERT INTO Manufacturer (Nom, Description)
 VALUES
@@ -11,7 +11,7 @@ VALUES
 
 INSERT INTO Model (Nom, Description)
 VALUES
-('DustTrak_Model', 'DustTrak environmental monitor model.');
+('8543', 'DustTrak environmental air monitor model.');
 
 INSERT INTO Type (Nom, Description)
 VALUES
@@ -23,7 +23,7 @@ VALUES
 IF NOT EXISTS (SELECT 1 FROM Room WHERE Id = 'plt-3013')
 BEGIN
     INSERT INTO Room (Id, Nom, Largeur, Longueur, Hauteur)
-    VALUES ('plt-3013', 'DustTrak Room', 10.0, 10.0, 3.0);
+    VALUES ('plt-0313', 'Main room.', 5.0, 8.0, 3.0);
 END;
 
 INSERT INTO Equipment (Id, AssetUuid, ParentEquipmentId, EquipmentTypeId, ManufacturerId, ModelId, RoomId, Nom, PrefabKey, SerialNumber, PurchaseDate)
@@ -31,34 +31,34 @@ SELECT
     'DustTrak', 
     'DUSTTRAK', 
     NULL, 
-    (SELECT Id FROM EquipmentType WHERE Nom = 'DustSensor'), 
+    (SELECT Id FROM EquipmentType WHERE Nom = 'Aerosol Monitor'), 
     (SELECT Id FROM Manufacturer WHERE Nom = 'TSI Incorporated'), 
-    (SELECT Id FROM Model WHERE Nom = 'DustTrak_Model'), 
-    'plt-3013', 
+    (SELECT Id FROM Model WHERE Nom = '8543'), 
+    'plt-0313', 
     'DustTrak', 
     'DustTrak_Prefab', 
     'DustTrak_Serial_001', 
     '2025-07-11';
 
-INSERT INTO Variable (EquipmentId, Nom, OpenFactoryVariableId, TypeId)
+INSERT INTO Variable (EquipmentId, Nom, DataItemId, TypeId)
 VALUES ((SELECT Id FROM Equipment WHERE Nom = 'DustTrak'), 'pm1_concentration', 'pm1_concentration', (SELECT Id FROM Type WHERE Nom = 'PM1Concentration'));
 
 INSERT INTO Data (VariableId, Value, Timestamp)
 VALUES (SCOPE_IDENTITY(), '0.0', CURRENT_TIMESTAMP);
 
-INSERT INTO Variable (EquipmentId, Nom, OpenFactoryVariableId, TypeId)
+INSERT INTO Variable (EquipmentId, Nom, DataItemId, TypeId)
 VALUES ((SELECT Id FROM Equipment WHERE Nom = 'DustTrak'), 'pm2_5_concentration', 'pm2_5_concentration', (SELECT Id FROM Type WHERE Nom = 'PM2_5Concentration'));
 
 INSERT INTO Data (VariableId, Value, Timestamp)
 VALUES (SCOPE_IDENTITY(), '0.0', CURRENT_TIMESTAMP);
 
-INSERT INTO Variable (EquipmentId, Nom, OpenFactoryVariableId, TypeId)
+INSERT INTO Variable (EquipmentId, Nom, DataItemId, TypeId)
 VALUES ((SELECT Id FROM Equipment WHERE Nom = 'DustTrak'), 'pm4_concentration', 'pm4_concentration', (SELECT Id FROM Type WHERE Nom = 'PM4Concentration'));
 
 INSERT INTO Data (VariableId, Value, Timestamp)
 VALUES (SCOPE_IDENTITY(), '0.0', CURRENT_TIMESTAMP);
 
-INSERT INTO Variable (EquipmentId, Nom, OpenFactoryVariableId, TypeId)
+INSERT INTO Variable (EquipmentId, Nom, DataItemId, TypeId)
 VALUES ((SELECT Id FROM Equipment WHERE Nom = 'DustTrak'), 'pm10_concentration', 'pm10_concentration', (SELECT Id FROM Type WHERE Nom = 'PM10Concentration'));
 
 INSERT INTO Data (VariableId, Value, Timestamp)

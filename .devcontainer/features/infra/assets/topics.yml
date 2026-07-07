@@ -6,6 +6,13 @@ topics:
   # ---------------------------------------------------------------------
   # 001-assets.sql
 
+  - name: ASSETS
+    partitions: 1
+    replication: 1
+    cleanup: delete
+    retention_bytes: 53687091200
+    comment: Source topic for FACTORY_ASSETS_STREAM with 50 GiB retention
+
   - name: ofa_assets
     partitions: 1
     replication: 1
