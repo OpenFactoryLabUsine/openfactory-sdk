@@ -13,6 +13,23 @@ set -e
 
 echo "🛑  Stopping OpenFactory stack..."
 
+WORKSPACE_ROOT="${WORKSPACE_ROOT:-/workspaces/openfactory-sdk}"
+ENV_FILE="${WORKSPACE_ROOT}/.env"
+
+if [ -f "$ENV_FILE" ]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "$ENV_FILE"
+  set +a
+else
+  echo "⚠️  No environment file found at ${ENV_FILE}; continuing without it."
+fi
+
+COMPOSE_ENV_ARGS=()
+if [ -f "$ENV_FILE" ]; then
+  COMPOSE_ENV_ARGS+=(--env-file "$ENV_FILE")
+fi
+
 # Common path for infra files
 SDK_PATH="/usr/local/share/openfactory-sdk"
 
@@ -31,22 +48,22 @@ ofa apps down ${SDK_PATH}/openfactory-infra/fanoutlayer
 
 # Tear down fan-out layer
 echo "🐳  Stopping OpenFactory fan-out layer..."
-docker compose -f "$FAN_OUT_LAYER_COMPOSE_FILE" -p fan-out-layer down -v
+docker compose "${COMPOSE_ENV_ARGS[@]}" -f "$FAN_OUT_LAYER_COMPOSE_FILE" -p fan-out-layer down -v
 
 # Tear down InfluxDB
 echo "🐳  Stopping InfluxDB..."
-docker compose -f "$INFLUXDB_COMPOSE_FILE" -p influxdb down -v
+docker compose "${COMPOSE_ENV_ARGS[@]}" -f "$INFLUXDB_COMPOSE_FILE" -p influxdb down -v
 
 # Tear down Traefik
 echo "🐳  Stopping Traefik..."
-docker compose -f "$TRAEFIK_COMPOSE_FILE" -p traefik down -v
+docker compose "${COMPOSE_ENV_ARGS[@]}" -f "$TRAEFIK_COMPOSE_FILE" -p traefik down -v
 
 # Tear down Prometheus
 echo "🐳  Stopping Prometheus..."
-docker compose -f "$PROMETHEUS_COMPOSE_FILE" -p prometheus down -v
+docker compose "${COMPOSE_ENV_ARGS[@]}" -f "$PROMETHEUS_COMPOSE_FILE" -p prometheus down -v
 
 # Tear down Kafka cluster
 echo "🐳  Stopping Kafka cluster..."
-docker compose -f "$KAFKA_COMPOSE_FILE" -p kafka-cluster down -v
+docker compose "${COMPOSE_ENV_ARGS[@]}" -f "$KAFKA_COMPOSE_FILE" -p kafka-cluster down -v
 
 echo "✅  OpenFactory stack stopped!"

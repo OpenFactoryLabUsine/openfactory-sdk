@@ -2,6 +2,8 @@ apps:
   openfactory_api:
       uuid: EQUIPMENTS-API
       image: ghcr.io/openfactorylabusine/equipments-api:latest
+      environment:
+        - NATS_SERVER=nats://nats:4222
       networks:
         - factory-net
       routing:

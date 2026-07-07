@@ -10,7 +10,7 @@ def main():
         
         time.sleep(10)
 
-        print("\n [2/3] Bringing up OPC-UA device (lab-usine/plt-3013/cnc.yml)...")
+        print("\n [2/3] Bringing up OPC-UA device (lab-usine/plt-0313/cnc.yml)...")
         device_proc = subprocess.Popen(["ofa", "device", "up", "lab-usine/plt-3013/cnc.yml"])
         processes.append(device_proc)
         

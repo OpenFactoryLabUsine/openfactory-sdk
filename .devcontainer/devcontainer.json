@@ -1,6 +1,6 @@
 {
   "name": "OpenFactory-SDK Dev Container",
-  "initializeCommand": "echo HOST_IP=$(ip route | grep default | awk '{print $3}') > .env",
+  "initializeCommand": "node .devcontainer/generate_env.js",
   "build": {
     "dockerfile": "Dockerfile",
     "context": ".",
@@ -11,7 +11,7 @@
     }
   },
   "features": {
-    "ghcr.io/devcontainers/features/docker-in-docker:3.1.0": {},
+    "ghcr.io/devcontainers/features/docker-in-docker:4.0.0": {},
     "./features/infra": {
       "useLocalSdk": true,
       "openfactory-version": "main"

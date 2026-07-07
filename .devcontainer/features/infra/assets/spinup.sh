@@ -18,6 +18,31 @@ set -e
 
 echo "🚀  Starting OpenFactory stack..."
 
+WORKSPACE_ROOT="${WORKSPACE_ROOT:-/workspaces/openfactory-sdk}"
+ENV_FILE="${WORKSPACE_ROOT}/.env"
+
+if [ -f "$ENV_FILE" ]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "$ENV_FILE"
+  set +a
+else
+  echo "No environment file found at ${ENV_FILE}; continuing without it."
+fi
+
+if [ -z "${KSQLDB_URL:-}" ]; then
+  if [ -n "${CONTAINER_IP:-}" ]; then
+    export KSQLDB_URL="http://${CONTAINER_IP}:8088"
+  else
+    export KSQLDB_URL="http://localhost:8088"
+  fi
+fi
+
+COMPOSE_ENV_ARGS=()
+if [ -f "$ENV_FILE" ]; then
+  COMPOSE_ENV_ARGS+=(--env-file "$ENV_FILE")
+fi
+
 # Location of docker-compose file
 SDK_PATH="/usr/local/share/openfactory-sdk"
 KAFKA_COMPOSE_FILE="${SDK_PATH}/openfactory-infra/docker-compose.yml"
@@ -44,23 +69,32 @@ PROMETHEUS_COMPOSE_FILE="${SDK_PATH}/openfactory-infra/docker-compose.prometheus
 
 # Spin up containers
 echo "🐳  Deploying Kafka CLuster ..."
-docker compose -f "${KAFKA_COMPOSE_FILE}" -p kafka-cluster up -d
+docker compose "${COMPOSE_ENV_ARGS[@]}" -f "${KAFKA_COMPOSE_FILE}" -p kafka-cluster up -d
 
 # Setup Traefik
 echo "🐳  Deploying Treafik ..."
-docker compose -f "${TRAEFIK_COMPOSE_FILE}" -p traefik up -d
+docker compose "${COMPOSE_ENV_ARGS[@]}" -f "${TRAEFIK_COMPOSE_FILE}" -p traefik up -d
 
 # Setup Prometheus
 echo "🐳  Deploying Prometheus ..."
-docker compose -f "${PROMETHEUS_COMPOSE_FILE}" -p prometheus up -d
+docker compose "${COMPOSE_ENV_ARGS[@]}" -f "${PROMETHEUS_COMPOSE_FILE}" -p prometheus up -d
 
 # Setup InfluxDB
 echo "🐳  Deploying InfluxDB ..."
-docker compose -f "$INFLUXDB_COMPOSE_FILE" -p influxdb up -d
+docker compose "${COMPOSE_ENV_ARGS[@]}" -f "$INFLUXDB_COMPOSE_FILE" -p influxdb up -d
 
 # Setup required Kafka topics
 echo "⚙️  Setting up Kafka topics ..."
 /usr/local/bin/create_topics.sh
+
+# Wait for ksqlDB to be ready
+echo "⏳ Waiting for ksqlDB to be ready..."
+until $(curl --silent --fail --output /dev/null "${KSQLDB_URL}/info"); do
+    printf '.'
+    sleep 2
+done
+echo " ksqlDB is ready!"
+
 
 # Run OpenFactory setup
 echo "⚙️  Deploying OpenFactory stream processing topology ..."
@@ -69,7 +103,7 @@ ofa setup-kafka --ksqldb-server "${KSQLDB_URL}"
 
 # Setup OpenFactory Fan-out Layer
 echo "🐳  Deploying OpenFactory fan-out layer ..."
-docker compose -f "$FAN_OUT_LAYER_COMPOSE_FILE" -p fan-out-layer up -d --scale asset-router=1
+docker compose "${COMPOSE_ENV_ARGS[@]}" -f "$FAN_OUT_LAYER_COMPOSE_FILE" -p fan-out-layer up -d --scale asset-router=1
 
 # Setup OpenFactory Monitoring Layer
 echo "🏭 Deploying OpenFactory monitoring layer ..."
