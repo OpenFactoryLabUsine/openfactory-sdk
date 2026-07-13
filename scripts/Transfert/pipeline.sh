@@ -4,17 +4,18 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 INFLUX_URL="${1:-"http://172.19.0.7:8181"}"
 INFLUX_TOKEN="${2:-"apiv3_cEcxV41p9h_Rrk2liaZygK92N3WeeljXRPtQ4MUUMpIdpXKW3KS93hCuBE7geHA3nKuLqCbo3na9dRvZ02i1GQ"}"
 SOURCE_DB="${3:-"ephemeral"}"
-TARGET_DB="${4:-"test"}"
-SOURCE_TABLE="${5:-"cnc_data"}"
-TARGET_TABLE="${6:-"prod_data"}"
-WANTED_ASSET_UUID="${7:-"DEV-UUID"}"
-BUFFER_TIME="${8:-"10"}"
-START_TIME_LOCAL="${9:-"2026-06-26T13:15:17"}"
-END_TIME_LOCAL="${10:-"2026-07-09T20:50:00"}"
-TIMEZONE="${11:-"America/Toronto"}"
-VARIABLE_RECORDING_ID="${12:-"2"}"
-MPS="${13:-"1"}"
-VARIABLE_ID="${14:-"1"}"
+TARGET_DB="${4:-"lifetime"}"
+SOURCE_TABLE="${5:-"AssetsMetrics"}"
+TARGET_TABLE="${6:-"AssetsMetrics"}"
+# Paramètres
+WANTED_ASSET_UUID="${7:-"DEV-UUID"}" # Obligatoire, Pour transférer tous les capteurs d'un équipement 
+BUFFER_TIME="${8:-"10"}" # Obligatoire
+START_TIME_LOCAL="${9:-"2026-06-26T13:15:17"}" # Obligatoire
+END_TIME_LOCAL="${10:-"2026-07-09T20:50:00"}" # Obligatoire
+TIMEZONE="${11:-"America/Toronto"}" # Facultatif
+VARIABLE_RECORDING_REQUEST_ID="${12:-"2"}" # Obligatoire
+MPS="${13:-"1"}" # Facultatif, A MODIFIER
+VARIABLE_ID="${14:-""}" # Facultatif, Si renseigné, pour transférer un capteur spécifique d'un équipement
 CHUNK_SIZE=20000
 START_TS=$(date +%s)
 # Configuration UNS
@@ -27,6 +28,7 @@ DB_PASS="password"
 LAST_TIME=""
 POLL_INTERVAL=""
 END_BUFFER_TIME_LOCAL=""
+DATA_ITEM_ID=""
 # Variables pour l'UNS
 STATUT="InProgress"
 TRANSFERT_START_TIME_UTC=$(date -u +"%Y-%m-%d %H:%M:%S")
@@ -46,44 +48,56 @@ update_uns() {
 
 # Fonction de gestion des erreurs
 handle_error() {
-local msg="$1"
+    local msg="$1"
     echo -e "\n[ERREUR] $msg" >&2
     STATUT="Failed"
     SQL_ERR_MSG="'${msg//\'/\'\'}'" # Escape des single quotes pour SQL et emballage
     TRANSFERT_END_TIME_UTC=$(date -u +"%Y-%m-%d %H:%M:%S")
     DURATION=$(( $(date +%s) - START_TS ))
-    update_uns "UPDATE VariableRecordingRequest SET Statut = 'Failed' WHERE id = '${VARIABLE_RECORDING_ID}';"
+    update_uns "UPDATE VariableRecordingRequest SET Statut = 'Failed' WHERE id = '${VARIABLE_RECORDING_REQUEST_ID}';"
     local eq_id="${EQUIPMENT_ID:-NULL}"
-    update_uns "INSERT INTO VariableRecordingLogs (VariableRecoringId, EquipmentId, TransfertStartTime, TransfertEndTime, Duration, TotalNumberLinesTransfered, NumberLinesTransferedDuringBuffer, ErrorMessage) VALUES ('${VARIABLE_RECORDING_ID}', '${eq_id}', '${TRANSFERT_START_TIME_UTC}', '${TRANSFERT_END_TIME_UTC}', '${DURATION}', ${TOTAL_NUMBER_LINES_TRANSFERRED}, ${BUFFER_NUMBER_LINES_TRANSFERRED}, ${SQL_ERR_MSG});"
+    update_uns "INSERT INTO VariableRecordingLogs (VariableRecoringId, EquipmentId, TransfertStartTime, TransfertEndTime, Duration, TotalNumberLinesTransfered, NumberLinesTransferedDuringBuffer, ErrorMessage) VALUES ('${VARIABLE_RECORDING_REQUEST_ID}', '${eq_id}', '${TRANSFERT_START_TIME_UTC}', '${TRANSFERT_END_TIME_UTC}', '${DURATION}', ${TOTAL_NUMBER_LINES_TRANSFERRED}, ${BUFFER_NUMBER_LINES_TRANSFERRED}, ${SQL_ERR_MSG});"
     exit 1
 }
 
 # 0) Mettre à jour le Statut dans l'UNS vers InProgress
-update_uns "UPDATE VariableRecordingRequest SET Statut = 'InProgress' WHERE id = '$VARIABLE_RECORDING_ID';"
+update_uns "UPDATE VariableRecordingRequest SET Statut = 'InProgress' WHERE id = '$VARIABLE_RECORDING_REQUEST_ID';"
 if [ $? -ne 0 ]; then
     echo "[x] Impossible de joindre SQL Server pour Modifier le statut à InProgress." >&2
     exit 1
 fi
 
 # Récupérer l'id de l'équipement associé à la variable lors de l'enregistrement
-EQUIPMENT_ID=$(sqlcmd -S "$DB_SERVER" -d "$DB_NAME" -U "$DB_USER" -P "$DB_PASS" -C -h -1 -W -Q "SET NOCOUNT ON; SELECT EquipmentId FROM Variable WHERE id = '$VARIABLE_ID';")
+EQUIPMENT_ID=$(sqlcmd -S "$DB_SERVER" -d "$DB_NAME" -U "$DB_USER" -P "$DB_PASS" -C -h -1 -W -Q "SET NOCOUNT ON; SELECT id FROM Equipment WHERE AssetUuid = '$WANTED_ASSET_UUID';")
 if [ $? -ne 0 ]; then
     echo "[x] Impossible de joindre SQL Server pour récupérer EquipmentId." >&2
     exit 1
 fi
 
-echo "EquipmentID : ${EQUIPMENT_ID}"
+if [ -z "$VARIABLE_ID" ]; then 
+    # Récupérer le DataItemId associé à l'id de la variable renseignée
+    DATA_ITEM_ID=$(sqlcmd -S "$DB_SERVER" -d "$DB_NAME" -U "$DB_USER" -P "$DB_PASS" -C -h -1 -W -Q "SET NOCOUNT ON; SELECT DataItemId FROM Variable WHERE id = '$VARIABLE_ID';")
+    if [ $? -ne 0 ]; then
+        echo "[x] Impossible de joindre SQL Server pour récupérer DataItemId lié à la variable_id $VARIABLE_ID." >&2
+        exit 1
+    fi
+fi
 
+echo "EquipmentID : ${EQUIPMENT_ID}; DataItemId : ${DATA_ITEM_ID}"
 # Convertir les heures locales en UTC pour la requête SQL
 EPOCH_START=$(TZ="$TIMEZONE" date -d "${START_TIME_LOCAL/T/ }" +"%s")
 EPOCH_END=$(TZ="$TIMEZONE" date -d "${END_TIME_LOCAL/T/ }" +"%s")
 START_TIME_UTC=$(date -u -d "@$EPOCH_START" +"%Y-%m-%dT%H:%M:%SZ")
 END_TIME_UTC=$(date -u -d "@$EPOCH_END" +"%Y-%m-%dT%H:%M:%SZ")
 
-echo -e "\nDébut du script à $(TZ="$TIMEZONE" date "+%H:%M:%S") heure locale ($TIMEZONE) pour l'ASSET_UUID : $WANTED_ASSET_UUID, période de transfert de $START_TIME_UTC UTC à $END_TIME_UTC UTC."
+echo -e "\nDébut du script à $(TZ="$TIMEZONE" date "+%H:%M:%S") heure locale ($TIMEZONE) pour l'AssetUuid : $WANTED_ASSET_UUID et le VariableId : $VARIABLE_ID, période de transfert de $START_TIME_UTC UTC à $END_TIME_UTC UTC."
 
 # 1) Nombre de lignes à transférer
-SQL_QUERY="SELECT COUNT(\"ASSET_UUID\") AS total_count FROM $SOURCE_TABLE WHERE \"ASSET_UUID\" = '$WANTED_ASSET_UUID' AND \"TAG\" NOT IN ('Application.License', 'Method', 'Method.Command', 'Library.License') AND \"TIMESTAMP\" >= '$START_TIME_UTC' AND \"TIMESTAMP\" <= '$END_TIME_UTC'"
+if [ -z "$VARIABLE_ID"]; then
+    SQL_QUERY="SELECT COUNT(\"AssetUuid\") AS total_count FROM $SOURCE_TABLE WHERE \"AssetUuid\" = '$WANTED_ASSET_UUID' AND \"Tag\" NOT IN ('Application.License', 'Method', 'Method.Command', 'Library.License') AND \"CreatedAt\" >= '$START_TIME_UTC' AND \"CreatedAt\" <= '$END_TIME_UTC'"
+else
+    SQL_QUERY="SELECT COUNT(\"AssetUuid\") AS total_count FROM $SOURCE_TABLE WHERE \"AssetUuid\" = '$WANTED_ASSET_UUID' AND \"Id\" = '$VARIABLE_ID' AND \"Tag\" NOT IN ('Application.License', 'Method', 'Method.Command', 'Library.License') AND \"CreatedAt\" >= '$START_TIME_UTC' AND \"CreatedAt\" <= '$END_TIME_UTC'"
+fi
 RESPONSE=$("$SCRIPT_DIR/simple_request.sh" "$INFLUX_URL" "$INFLUX_TOKEN" "$SOURCE_DB" "$SQL_QUERY")
 if [ $? -ne 0 ]; then
     handle_error "[x] Échec de connexion ou d'exécution de simple_request.sh (Source: $SOURCE_DB)."
@@ -92,15 +106,23 @@ TOTAL_NUMBER_LINES_TRANSFERRED=$(echo "$RESPONSE" | jq -r '.total_count // 0')
 fi
 
 # 2) Transfert des données de la DB SOURCE vers la DB TARGET
-echo -e "\n[~] Lancement du transfert de $TOTAL_NUMBER_LINES_TRANSFERRED lignes de la DB $SOURCE_DB vers la DB $TARGET_DB pour l'ASSET_UUID : $WANTED_ASSET_UUID."
-SQL_QUERY="SELECT CAST(arrow_cast(time, 'Int64') AS VARCHAR) AS epoch_ns, \"ASSET_UUID\", \"ID\", \"TAG\", \"TYPE\", CAST(\"VALUE\" AS VARCHAR) AS \"VALUE\", CAST(\"TIMESTAMP\" AS VARCHAR) AS \"TIMESTAMP\" FROM $SOURCE_TABLE WHERE \"ASSET_UUID\" = '$WANTED_ASSET_UUID' AND \"TAG\" NOT IN ('Application.License', 'Method', 'Method.Command', 'Library.License') AND \"TIMESTAMP\" >= '$START_TIME_UTC' AND \"TIMESTAMP\" <= '$END_TIME_UTC'"
+echo -e "\n[~] Lancement du transfert de $TOTAL_NUMBER_LINES_TRANSFERRED lignes de la DB $SOURCE_DB vers la DB $TARGET_DB pour l'AssetUuid : $WANTED_ASSET_UUID."
+if [ -z "$VARIABLE_ID"]; then
+    SQL_QUERY="SELECT CAST(arrow_cast(time, 'Int64') AS VARCHAR) AS epoch_ns, \"AssetUuid\", \"Id\", \"Tag\", \"Type\", CAST(\"Value\" AS VARCHAR) AS \"Value\", CAST(\"CreatedAt\" AS VARCHAR) AS \"CreatedAt\" FROM $SOURCE_TABLE WHERE \"AssetUuid\" = '$WANTED_ASSET_UUID' AND \"Tag\" NOT IN ('Application.License', 'Method', 'Method.Command', 'Library.License') AND \"CreatedAt\" >= '$START_TIME_UTC' AND \"CreatedAt\" <= '$END_TIME_UTC'"
+else
+    SQL_QUERY="SELECT CAST(arrow_cast(time, 'Int64') AS VARCHAR) AS epoch_ns, \"AssetUuid\", \"Id\", \"Tag\", \"Type\", CAST(\"Value\" AS VARCHAR) AS \"Value\", CAST(\"CreatedAt\" AS VARCHAR) AS \"CreatedAt\" FROM $SOURCE_TABLE WHERE \"AssetUuid\" = '$WANTED_ASSET_UUID' AND \"Id\" = '$VARIABLE_ID' AND \"Tag\" NOT IN ('Application.License', 'Method', 'Method.Command', 'Library.License') AND \"CreatedAt\" >= '$START_TIME_UTC' AND \"CreatedAt\" <= '$END_TIME_UTC'"
+fi
 "$SCRIPT_DIR/data_transfert.sh" "$INFLUX_URL" "$INFLUX_TOKEN" "$SOURCE_DB" "$TARGET_DB" "$SQL_QUERY" "$CHUNK_SIZE" "$TARGET_TABLE"
 if [ $? -ne 0 ]; then
     handle_error "[x] Erreur lors du transfert des données (data_transfert.sh)."
 fi
 
 # 3) Récupération du dernier timestamp écrit dans la DB TARGET
-SQL_QUERY="SELECT CAST(arrow_cast(time, 'Int64') AS VARCHAR) AS epoch_ns FROM $TARGET_TABLE WHERE \"TIMESTAMP\" >= '$START_TIME_UTC' AND \"TIMESTAMP\" <= '$END_TIME_UTC' ORDER BY time DESC LIMIT 1"
+if [ -z "$VARIABLE_ID"]; then
+    SQL_QUERY="SELECT CAST(arrow_cast(time, 'Int64') AS VARCHAR) AS epoch_ns FROM $TARGET_TABLE WHERE \"AssetUuid\" = '$WANTED_ASSET_UUID' AND \"CreatedAt\" >= '$START_TIME_UTC' AND \"CreatedAt\" <= '$END_TIME_UTC' ORDER BY time DESC LIMIT 1"
+else
+    SQL_QUERY="SELECT CAST(arrow_cast(time, 'Int64') AS VARCHAR) AS epoch_ns FROM $TARGET_TABLE WHERE \"AssetUuid\" = '$WANTED_ASSET_UUID' AND \"Id\" = '$VARIABLE_ID' AND \"CreatedAt\" >= '$START_TIME_UTC' AND \"CreatedAt\" <= '$END_TIME_UTC' ORDER BY time DESC LIMIT 1"
+fi
 RESPONSE=$("$SCRIPT_DIR/simple_request.sh" "$INFLUX_URL" "$INFLUX_TOKEN" "$TARGET_DB" "$SQL_QUERY")
 LAST_TIME=$(echo "$RESPONSE" | jq -r '.epoch_ns // empty')
 # -z = vérifie si la variable est vide
@@ -129,7 +151,11 @@ while [ $(date +%s) -lt $END_BUFFER_TIME_LOCAL ]; do
     # 4.1) Comptage du nombre de données manquantes
     # -gt vérifie si la variable est supérieure à 0
     if [ "$LAST_TIME" -gt 0 ]; then
-        SQL_QUERY="SELECT COUNT(\"ASSET_UUID\") AS total_count FROM $SOURCE_TABLE WHERE \"ASSET_UUID\" = '$WANTED_ASSET_UUID' AND \"TIMESTAMP\" >= '$START_TIME_UTC' AND \"TIMESTAMP\" <= '$END_TIME_UTC' AND time > arrow_cast($LAST_TIME, 'Timestamp(Nanosecond, None)')"
+        if [ -z "$VARIABLE_ID"]; then
+            SQL_QUERY="SELECT COUNT(\"AssetUuid\") AS total_count FROM $SOURCE_TABLE WHERE \"AssetUuid\" = '$WANTED_ASSET_UUID' AND \"Tag\" NOT IN ('Application.License', 'Method', 'Method.Command', 'Library.License') AND \"CreatedAt\" >= '$START_TIME_UTC' AND \"CreatedAt\" <= '$END_TIME_UTC' AND time > arrow_cast($LAST_TIME, 'Timestamp(Nanosecond, None)')"
+        else
+            SQL_QUERY="SELECT COUNT(\"AssetUuid\") AS total_count FROM $SOURCE_TABLE WHERE \"AssetUuid\" = '$WANTED_ASSET_UUID' AND \"Id\" = '$VARIABLE_ID' AND \"Tag\" NOT IN ('Application.License', 'Method', 'Method.Command', 'Library.License') AND \"CreatedAt\" >= '$START_TIME_UTC' AND \"CreatedAt\" <= '$END_TIME_UTC' AND time > arrow_cast($LAST_TIME, 'Timestamp(Nanosecond, None)')"
+        fi
         RESPONSE=$("$SCRIPT_DIR/simple_request.sh" "$INFLUX_URL" "$INFLUX_TOKEN" "$SOURCE_DB" "$SQL_QUERY")
         if [ $? -ne 0 ]; then
             handle_error "[x] Échec de connexion ou d'exécution de simple_request.sh (Source: $SOURCE_DB)."
@@ -147,13 +173,21 @@ while [ $(date +%s) -lt $END_BUFFER_TIME_LOCAL ]; do
         echo "[!] Buffer : $REMAINING_COUNT nouvelles données manquantes détectées."
         
         # 4.2) Transfert des données manquantes
-        SQL_QUERY="SELECT CAST(arrow_cast(time, 'Int64') AS VARCHAR) AS epoch_ns, \"ASSET_UUID\", \"ID\", \"TAG\", \"TYPE\", CAST(\"VALUE\" AS VARCHAR) AS \"VALUE\", CAST(\"TIMESTAMP\" AS VARCHAR) AS \"TIMESTAMP\" FROM $SOURCE_TABLE WHERE \"ASSET_UUID\" = '$WANTED_ASSET_UUID' AND \"TIMESTAMP\" >= '$START_TIME_UTC' AND \"TIMESTAMP\" <= '$END_TIME_UTC' AND time > arrow_cast($LAST_TIME, 'Timestamp(Nanosecond, None)')"
+        if [ -z "$VARIABLE_ID"]; then
+            SQL_QUERY="SELECT CAST(arrow_cast(time, 'Int64') AS VARCHAR) AS epoch_ns, \"AssetUuid\", \"Id\", \"Tag\", \"Type\", CAST(\"Value\" AS VARCHAR) AS \"Value\", CAST(\"CreatedAt\" AS VARCHAR) AS \"CreatedAt\" FROM $SOURCE_TABLE WHERE \"AssetUuid\" = '$WANTED_ASSET_UUID' AND \"Tag\" NOT IN ('Application.License', 'Method', 'Method.Command', 'Library.License') AND \"CreatedAt\" >= '$START_TIME_UTC' AND \"CreatedAt\" <= '$END_TIME_UTC' AND time > arrow_cast($LAST_TIME, 'Timestamp(Nanosecond, None)')"
+        else
+            SQL_QUERY="SELECT CAST(arrow_cast(time, 'Int64') AS VARCHAR) AS epoch_ns, \"AssetUuid\", \"Id\", \"Tag\", \"Type\", CAST(\"Value\" AS VARCHAR) AS \"Value\", CAST(\"CreatedAt\" AS VARCHAR) AS \"CreatedAt\" FROM $SOURCE_TABLE WHERE \"AssetUuid\" = '$WANTED_ASSET_UUID' AND \"Id\" = '$VARIABLE_ID' AND \"Tag\" NOT IN ('Application.License', 'Method', 'Method.Command', 'Library.License') AND \"CreatedAt\" >= '$START_TIME_UTC' AND \"CreatedAt\" <= '$END_TIME_UTC' AND time > arrow_cast($LAST_TIME, 'Timestamp(Nanosecond, None)')"
+        fi
         "$SCRIPT_DIR/data_transfert.sh" "$INFLUX_URL" "$INFLUX_TOKEN" "$SOURCE_DB" "$TARGET_DB" "$SQL_QUERY" "$CHUNK_SIZE" "$TARGET_TABLE"
         if [ $? -ne 0 ]; then
             handle_error "[x] Erreur lors du transfert des données (data_transfert.sh)."
         fi
         # Mise à jour du pivot pour éviter de re-transférer les mêmes données à la prochaine itération
-        SQL_QUERY="SELECT CAST(arrow_cast(time, 'Int64') AS VARCHAR) AS epoch_ns FROM $TARGET_TABLE WHERE \"TIMESTAMP\" >= '$START_TIME_UTC' AND \"TIMESTAMP\" <= '$END_TIME_UTC' ORDER BY time DESC LIMIT 1"
+        if [ -z "$VARIABLE_ID"]; then
+            SQL_QUERY="SELECT CAST(arrow_cast(time, 'Int64') AS VARCHAR) AS epoch_ns FROM $TARGET_TABLE WHERE \"AssetUuid\" = '$WANTED_ASSET_UUID' AND \"CreatedAt\" >= '$START_TIME_UTC' AND \"CreatedAt\" <= '$END_TIME_UTC' ORDER BY time DESC LIMIT 1"
+        else
+            SQL_QUERY="SELECT CAST(arrow_cast(time, 'Int64') AS VARCHAR) AS epoch_ns FROM $TARGET_TABLE WHERE \"AssetUuid\" = '$WANTED_ASSET_UUID' AND \"Id\" = '$VARIABLE_ID' AND \"CreatedAt\" >= '$START_TIME_UTC' AND \"CreatedAt\" <= '$END_TIME_UTC' ORDER BY time DESC LIMIT 1"
+        fi
         RESPONSE=$("$SCRIPT_DIR/simple_request.sh" "$INFLUX_URL" "$INFLUX_TOKEN" "$TARGET_DB" "$SQL_QUERY")
         if [ $? -ne 0 ]; then
             handle_error "[x] Échec de connexion ou d'exécution de simple_request.sh (Source: $SOURCE_DB)."
@@ -171,7 +205,7 @@ if [ "$STATUT" != "Failed" ]; then
 fi
 
 # Mettre à jour le Statut dans l'UNS vers Processed
-update_uns "UPDATE VariableRecordingRequest SET Statut = 'Processed' WHERE Id = '$VARIABLE_RECORDING_ID';"
+update_uns "UPDATE VariableRecordingRequest SET Statut = 'Processed' WHERE Id = '$VARIABLE_RECORDING_REQUEST_ID';"
 if [ $? -ne 0 ]; then
     echo "[x] Impossible de joindre SQL Server pour mettre à jour le statut vers Processed." >&2
     exit 1
@@ -184,7 +218,7 @@ DURATION=$((END_TS - START_TS))
 # Temps de fin du transfert en UTC
 TRANSFERT_END_TIME_UTC=$(date -u +"%Y-%m-%d %H:%M:%S")
 # Créer un enregistrement dans la table VariableRecordingLogs pour le transfert
-update_uns "INSERT INTO VariableRecordingLogs (VariableRecoringId, EquipmentId, TransfertStartTime, TransfertEndTime, Duration, TotalNumberLinesTransfered, NumberLinesTransferedDuringBuffer, ErrorMessage) VALUES ('${VARIABLE_RECORDING_ID}', '${EQUIPMENT_ID}', '${TRANSFERT_START_TIME_UTC}', '${TRANSFERT_END_TIME_UTC}', '${DURATION}', ${TOTAL_NUMBER_LINES_TRANSFERRED}, ${BUFFER_NUMBER_LINES_TRANSFERRED}, ${SQL_ERR_MSG});"
+update_uns "INSERT INTO VariableRecordingLogs (VariableRecoringId, EquipmentId, TransfertStartTime, TransfertEndTime, Duration, TotalNumberLinesTransfered, NumberLinesTransferedDuringBuffer, ErrorMessage) VALUES ('${VARIABLE_RECORDING_REQUEST_ID}', '${EQUIPMENT_ID}', '${TRANSFERT_START_TIME_UTC}', '${TRANSFERT_END_TIME_UTC}', '${DURATION}', ${TOTAL_NUMBER_LINES_TRANSFERRED}, ${BUFFER_NUMBER_LINES_TRANSFERRED}, ${SQL_ERR_MSG});"
 if [ $? -ne 0 ]; then
     echo "[x] Impossible de joindre SQL Server pour créer un enregistrement dans VariableRecordingLogs." >&2
     exit 1
