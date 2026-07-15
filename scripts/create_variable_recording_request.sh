@@ -94,9 +94,10 @@ else
   echo -e "\n --- Sélection de la variable à enregistrer ---"
   get_uns_data "SET NOCOUNT ON; SELECT Nom FROM Variable WHERE EquipmentId IN (SELECT id FROM Equipment WHERE AssetUuid = '$WANTED_ASSET_UUID');"
 
-  read -p "[Facultatif] Entrez le nom de la variable pour n'enregistrer qu'un capteur spécifique de l'équipement sélectionné : " WANTED_VARIABLE_NAME
-  if [ -n "$WANTED_VARIABLE_NAME" ]; then
-    check_if_uns_data_exists "SET NOCOUNT ON; SELECT Nom FROM Variable WHERE Nom = '$WANTED_VARIABLE_NAME' AND EquipmentId IN (SELECT id FROM Equipment WHERE AssetUuid = '$WANTED_ASSET_UUID');"
+  read -p "[Facultatif] Entrez le nom de la variable pour n'enregistrer qu'un capteur spécifique de l'équipement sélectionné : " 'WANTED_VARIABLE_NAME_RESPONSE'
+  if [ -n "$WANTED_VARIABLE_NAME_RESPONSE" ]; then
+    WANTED_VARIABLE_NAME="'$WANTED_VARIABLE_NAME_RESPONSE'"
+    check_if_uns_data_exists "SET NOCOUNT ON; SELECT Nom FROM Variable WHERE Nom = $WANTED_VARIABLE_NAME AND EquipmentId IN (SELECT id FROM Equipment WHERE AssetUuid = '$WANTED_ASSET_UUID');"
   else
     WANTED_VARIABLE_NAME="NULL"
   fi
@@ -130,7 +131,7 @@ else
 fi
 
 echo "Création de la demande d'enregistrement de variable dans UNS..."
-update_uns "INSERT INTO VariableRecordingRequest (WantedVariableName, WantedAssetUuid, Statut, LocalStartTime, LocalEndTime, Mps, BufferTime, TimeZone) VALUES ('$WANTED_VARIABLE_NAME', '$WANTED_ASSET_UUID', 'Planned', '$LOCAL_START_TIME', '$LOCAL_END_TIME', '$MPS', '$BUFFER_TIME', '$TIME_ZONE');"
+update_uns "INSERT INTO VariableRecordingRequest (WantedVariableName, WantedAssetUuid, Statut, LocalStartTime, LocalEndTime, Mps, BufferTime, TimeZone) VALUES ($WANTED_VARIABLE_NAME, '$WANTED_ASSET_UUID', 'Planned', '$LOCAL_START_TIME', '$LOCAL_END_TIME', '$MPS', '$BUFFER_TIME', '$TIME_ZONE');"
 if [ $? -ne 0 ]; then
     echo "[x] Impossible de joindre SQL Server pour ajouter la demande d'enregistrement." >&2
     exit 1
