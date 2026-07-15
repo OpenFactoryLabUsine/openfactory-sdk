@@ -16,7 +16,7 @@ curl -s -X POST "$INFLUX_URL/api/v3/query_sql" \
       \"q\": \"${SQL_QUERY//\"/\\\"}\"
     }" | jq -r '
     ' | jq -r --arg target "$TARGET_TABLE" '
-      "\($target),ASSET_UUID=\(.ASSET_UUID),ID=\(.ID),TAG=\(.TAG),TYPE=\(.TYPE) VALUE=\"\(.VALUE)\",TIMESTAMP=\"\(.TIMESTAMP)\" \(.epoch_ns)"
+      "\($target),AssetUuid=\(.AssetUuid),Id=\(.Id),Tag=\(.Tag),Type=\(.Type) Value=\"\(.Value)\",CreatedAt=\"\(.CreatedAt)\" \(.epoch_ns)"
     ' | split -l "$CHUNK_SIZE" --filter="curl -s -X POST '$INFLUX_URL/api/v3/write_lp?db=$TARGET_DB&precision=ns' -H 'Authorization: Bearer $INFLUX_TOKEN' -H 'Content-Type: text/plain; charset=utf-8' --data-binary @-"
 
 
