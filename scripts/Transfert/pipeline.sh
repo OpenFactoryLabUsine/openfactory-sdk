@@ -1,25 +1,32 @@
 #!/bin/bash
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ENV_FILE="$SCRIPT_DIR/../../.env"
+if [ -f "$ENV_FILE" ]; then
+    export $(grep -v '^#' "$ENV_FILE" | xargs)
+else
+    echo "[x] Fichier .env introuvable. Veuillez créer un fichier .env à la racine du projet avec les variables d'environnement nécessaires."
+    exit 1
+fi
+
 # Configuration
-INFLUX_URL="http://172.19.0.7:8181"
-INFLUX_TOKEN=""
-SOURCE_DB="ephemeral"
-TARGET_DB="lifetime"
-SOURCE_TABLE="AssetsMetrics"
-TARGET_TABLE="AssetsMetrics"
-CHUNK_SIZE=20000
+INFLUX_URL=$INFLUX_URL
+INFLUX_TOKEN=$INFLUX_TOKEN
+SOURCE_DB=$SOURCE_DB
+TARGET_DB=$TARGET_DB
+SOURCE_TABLE=$SOURCE_TABLE
+TARGET_TABLE=$TARGET_TABLE
+CHUNK_SIZE=$CHUNK_SIZE
 START_TS=$(date +%s)
+# Configuration UNS
+DB_SERVER=$DB_SERVER
+DB_NAME=$DB_NAME
+DB_USER=$DB_USER
+DB_PASS=$DB_PASS
 # Paramètre
 VARIABLE_RECORDING_REQUEST_ID="${1:-""}" # Obligatoire
-# Configuration UNS
-DB_SERVER="host.docker.internal"
-DB_NAME="labusine_db"
-DB_USER="bash"
-DB_PASS="password"
 
 # Variables qui vont être mises à jour
 LAST_TIME=""
-POLL_INTERVAL=""
 END_BUFFER_TIME_LOCAL=""
 # Variables pour l'UNS
 STATUT="InProgress"
@@ -157,72 +164,47 @@ else
     echo -e "\n[~] Timestamp en nanosecondes de la colonne \"time\" de la dernière donnée transférée dans la DB $TARGET_DB : $LAST_TIME"
 fi
 
-# 4) Boucle de buffer pour vérifier les données manquantes
-# Si le temps de buffer est inférieur ou égal à 60 secondes
-if [ "$BUFFER_TIME" -le 60 ]; then
-    POLL_INTERVAL=$BUFFER_TIME
-else
-    POLL_INTERVAL=$((BUFFER_TIME / 2))
-fi
-
+# 4) Période de buffer pour vérifier les données manquantes
 # Calcul du temps de fin de la période de buffer 
 END_BUFFER_TIME_LOCAL=$(( $(date +%s) + BUFFER_TIME ))
 
 echo -e "\n[~] Début de la période de buffer de ${BUFFER_TIME} secondes à $(TZ="$TIMEZONE" date "+%H:%M:%S") heure locale ($TIMEZONE). Fin prévue vers $(TZ="$TIMEZONE" date -d "@$END_BUFFER_TIME_LOCAL" '+%H:%M:%S') heure locale ($TIMEZONE)."
 
-while [ $(date +%s) -lt $END_BUFFER_TIME_LOCAL ]; do
-    sleep $POLL_INTERVAL
-    # 4.1) Comptage du nombre de données manquantes
-    # -gt vérifie si la variable est supérieure à 0
-    if [ "$LAST_TIME" -gt 0 ]; then
-        if [ "$WANTED_VARIABLE_NAME" = 'NULL' ]; then
-            SQL_QUERY="SELECT COUNT(\"AssetUuid\") AS total_count FROM \"$SOURCE_TABLE\" WHERE \"AssetUuid\" = '$WANTED_ASSET_UUID' AND \"Tag\" NOT IN ('Application.License', 'Method', 'Method.Command', 'Library.License') AND \"CreatedAt\" >= '$START_TIME_UTC' AND \"CreatedAt\" <= '$END_TIME_UTC' AND time > arrow_cast($LAST_TIME, 'Timestamp(Nanosecond, None)')"
-        else
-            SQL_QUERY="SELECT COUNT(\"AssetUuid\") AS total_count FROM \"$SOURCE_TABLE\" WHERE \"AssetUuid\" = '$WANTED_ASSET_UUID' AND \"Id\" = '$WANTED_VARIABLE_NAME' AND \"Tag\" NOT IN ('Application.License', 'Method', 'Method.Command', 'Library.License') AND \"CreatedAt\" >= '$START_TIME_UTC' AND \"CreatedAt\" <= '$END_TIME_UTC' AND time > arrow_cast($LAST_TIME, 'Timestamp(Nanosecond, None)')"
-        fi
-        RESPONSE=$("$SCRIPT_DIR/simple_request.sh" "$INFLUX_URL" "$INFLUX_TOKEN" "$SOURCE_DB" "$SQL_QUERY")
-        if [ $? -ne 0 ]; then
-            handle_error "[x] Échec de connexion ou d'exécution de simple_request.sh (Source: $SOURCE_DB)."
-        else
-        REMAINING_COUNT=$(echo "$RESPONSE" | jq -r '.total_count // 0')
-        BUFFER_NUMBER_LINES_TRANSFERRED=$((BUFFER_NUMBER_LINES_TRANSFERRED + REMAINING_COUNT))
-        fi
+sleep $BUFFER_TIME
+# 4.1) Comptage du nombre de données manquantes
+# -gt vérifie si la variable est supérieure à 0
+if [ "$LAST_TIME" -gt 0 ]; then
+    if [ "$WANTED_VARIABLE_NAME" = 'NULL' ]; then
+        SQL_QUERY="SELECT COUNT(\"AssetUuid\") AS total_count FROM \"$SOURCE_TABLE\" WHERE \"AssetUuid\" = '$WANTED_ASSET_UUID' AND \"Tag\" NOT IN ('Application.License', 'Method', 'Method.Command', 'Library.License') AND \"CreatedAt\" >= '$START_TIME_UTC' AND \"CreatedAt\" <= '$END_TIME_UTC' AND time > arrow_cast($LAST_TIME, 'Timestamp(Nanosecond, None)')"
     else
-        REMAINING_COUNT=0
+        SQL_QUERY="SELECT COUNT(\"AssetUuid\") AS total_count FROM \"$SOURCE_TABLE\" WHERE \"AssetUuid\" = '$WANTED_ASSET_UUID' AND \"Id\" = '$WANTED_VARIABLE_NAME' AND \"Tag\" NOT IN ('Application.License', 'Method', 'Method.Command', 'Library.License') AND \"CreatedAt\" >= '$START_TIME_UTC' AND \"CreatedAt\" <= '$END_TIME_UTC' AND time > arrow_cast($LAST_TIME, 'Timestamp(Nanosecond, None)')"
     fi
-
-    if [ "$REMAINING_COUNT" = "0" ] || [ -z "$REMAINING_COUNT" ] || [ "$REMAINING_COUNT" = "null" ]; then
-        echo -e "\n[~] Buffer : aucune nouvelle donnée manquante détectée."
+    RESPONSE=$("$SCRIPT_DIR/simple_request.sh" "$INFLUX_URL" "$INFLUX_TOKEN" "$SOURCE_DB" "$SQL_QUERY")
+    if [ $? -ne 0 ]; then
+        handle_error "[x] Échec de connexion ou d'exécution de simple_request.sh (Source: $SOURCE_DB)."
     else
-        echo "[!] Buffer : $REMAINING_COUNT nouvelles données manquantes détectées."
-        
-        # 4.2) Transfert des données manquantes
-        if [ "$WANTED_VARIABLE_NAME" = 'NULL' ]; then
-            SQL_QUERY="SELECT CAST(arrow_cast(time, 'Int64') AS VARCHAR) AS epoch_ns, \"AssetUuid\", \"Id\", \"Tag\", \"Type\", CAST(\"Value\" AS VARCHAR) AS \"Value\", CAST(\"CreatedAt\" AS VARCHAR) AS \"CreatedAt\" FROM \"$SOURCE_TABLE\" WHERE \"AssetUuid\" = '$WANTED_ASSET_UUID' AND \"Tag\" NOT IN ('Application.License', 'Method', 'Method.Command', 'Library.License') AND \"CreatedAt\" >= '$START_TIME_UTC' AND \"CreatedAt\" <= '$END_TIME_UTC' AND time > arrow_cast($LAST_TIME, 'Timestamp(Nanosecond, None)')"
-        else
-            SQL_QUERY="SELECT CAST(arrow_cast(time, 'Int64') AS VARCHAR) AS epoch_ns, \"AssetUuid\", \"Id\", \"Tag\", \"Type\", CAST(\"Value\" AS VARCHAR) AS \"Value\", CAST(\"CreatedAt\" AS VARCHAR) AS \"CreatedAt\" FROM \"$SOURCE_TABLE\" WHERE \"AssetUuid\" = '$WANTED_ASSET_UUID' AND \"Id\" = '$WANTED_VARIABLE_NAME' AND \"Tag\" NOT IN ('Application.License', 'Method', 'Method.Command', 'Library.License') AND \"CreatedAt\" >= '$START_TIME_UTC' AND \"CreatedAt\" <= '$END_TIME_UTC' AND time > arrow_cast($LAST_TIME, 'Timestamp(Nanosecond, None)')"
-        fi
-        "$SCRIPT_DIR/data_transfert.sh" "$INFLUX_URL" "$INFLUX_TOKEN" "$SOURCE_DB" "$TARGET_DB" "$SQL_QUERY" "$CHUNK_SIZE" "$TARGET_TABLE"
-        if [ $? -ne 0 ]; then
-            handle_error "[x] Erreur lors du transfert des données (data_transfert.sh)."
-        fi
-        # Mise à jour du pivot pour éviter de re-transférer les mêmes données à la prochaine itération
-        if [ "$WANTED_VARIABLE_NAME" = 'NULL' ]; then
-            SQL_QUERY="SELECT CAST(arrow_cast(time, 'Int64') AS VARCHAR) AS epoch_ns FROM \"$TARGET_TABLE\" WHERE \"AssetUuid\" = '$WANTED_ASSET_UUID' AND \"CreatedAt\" >= '$START_TIME_UTC' AND \"CreatedAt\" <= '$END_TIME_UTC' ORDER BY time DESC LIMIT 1"
-        else
-            SQL_QUERY="SELECT CAST(arrow_cast(time, 'Int64') AS VARCHAR) AS epoch_ns FROM \"$TARGET_TABLE\" WHERE \"AssetUuid\" = '$WANTED_ASSET_UUID' AND \"Id\" = '$WANTED_VARIABLE_NAME' AND \"CreatedAt\" >= '$START_TIME_UTC' AND \"CreatedAt\" <= '$END_TIME_UTC' ORDER BY time DESC LIMIT 1"
-        fi
-        RESPONSE=$("$SCRIPT_DIR/simple_request.sh" "$INFLUX_URL" "$INFLUX_TOKEN" "$TARGET_DB" "$SQL_QUERY")
-        if [ $? -ne 0 ]; then
-            handle_error "[x] Échec de connexion ou d'exécution de simple_request.sh (Source: $SOURCE_DB)."
-        fi
-        NEW_LAST_TIME=$(echo "$RESPONSE" | jq -r '.epoch_ns // empty')
-        if [ -n "$NEW_LAST_TIME" ] && [ "$NEW_LAST_TIME" != "null" ]; then
-            LAST_TIME=$NEW_LAST_TIME
-            echo -e "[~] Timestamp en nanosecondes de la colonne time de la dernière donnée transférée dans la DB $TARGET_DB : $LAST_TIME \n"
-        fi
+    REMAINING_COUNT=$(echo "$RESPONSE" | jq -r '.total_count // 0')
+    BUFFER_NUMBER_LINES_TRANSFERRED=$REMAINING_COUNT
     fi
-done
+else
+    REMAINING_COUNT=0
+fi
+if [ "$REMAINING_COUNT" = "0" ] || [ -z "$REMAINING_COUNT" ] || [ "$REMAINING_COUNT" = "null" ]; then
+    echo -e "\n[~] Buffer : aucune nouvelle donnée manquante détectée."
+else
+    echo "[!] Buffer : $REMAINING_COUNT nouvelles données manquantes détectées."
+    
+    # 4.2) Transfert des données manquantes
+    if [ "$WANTED_VARIABLE_NAME" = 'NULL' ]; then
+        SQL_QUERY="SELECT CAST(arrow_cast(time, 'Int64') AS VARCHAR) AS epoch_ns, \"AssetUuid\", \"Id\", \"Tag\", \"Type\", CAST(\"Value\" AS VARCHAR) AS \"Value\", CAST(\"CreatedAt\" AS VARCHAR) AS \"CreatedAt\" FROM \"$SOURCE_TABLE\" WHERE \"AssetUuid\" = '$WANTED_ASSET_UUID' AND \"Tag\" NOT IN ('Application.License', 'Method', 'Method.Command', 'Library.License') AND \"CreatedAt\" >= '$START_TIME_UTC' AND \"CreatedAt\" <= '$END_TIME_UTC' AND time > arrow_cast($LAST_TIME, 'Timestamp(Nanosecond, None)')"
+    else
+        SQL_QUERY="SELECT CAST(arrow_cast(time, 'Int64') AS VARCHAR) AS epoch_ns, \"AssetUuid\", \"Id\", \"Tag\", \"Type\", CAST(\"Value\" AS VARCHAR) AS \"Value\", CAST(\"CreatedAt\" AS VARCHAR) AS \"CreatedAt\" FROM \"$SOURCE_TABLE\" WHERE \"AssetUuid\" = '$WANTED_ASSET_UUID' AND \"Id\" = '$WANTED_VARIABLE_NAME' AND \"Tag\" NOT IN ('Application.License', 'Method', 'Method.Command', 'Library.License') AND \"CreatedAt\" >= '$START_TIME_UTC' AND \"CreatedAt\" <= '$END_TIME_UTC' AND time > arrow_cast($LAST_TIME, 'Timestamp(Nanosecond, None)')"
+    fi
+    "$SCRIPT_DIR/data_transfert.sh" "$INFLUX_URL" "$INFLUX_TOKEN" "$SOURCE_DB" "$TARGET_DB" "$SQL_QUERY" "$CHUNK_SIZE" "$TARGET_TABLE"
+    if [ $? -ne 0 ]; then
+        handle_error "[x] Erreur lors du transfert des données (data_transfert.sh)."
+    fi
+fi
 
 if [ "$STATUT" != "Failed" ]; then
     STATUT="Processed"

@@ -1,5 +1,12 @@
 #!/bin/bash
-
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ENV_FILE="$SCRIPT_DIR/../.env"
+if [ -f "$ENV_FILE" ]; then
+    export $(grep -v '^#' "$ENV_FILE" | xargs)
+else
+    echo "[x] Fichier .env introuvable. Veuillez créer un fichier .env à la racine du projet avec les variables d'environnement nécessaires."
+    exit 1
+fi
 # Configuration
 IS_AUTOMATED="false"
 WANTED_ASSET_UUID=${1:-""}
@@ -11,10 +18,10 @@ BUFFER_TIME=${6:-""}
 TIME_ZONE=${7:-"America/Toronto"}
 
 # Configuration UNS
-DB_SERVER="host.docker.internal"
-DB_NAME="labusine_db"
-DB_USER="bash"
-DB_PASS="password"
+DB_SERVER=$DB_SERVER
+DB_NAME=$DB_NAME
+DB_USER=$DB_USER
+DB_PASS=$DB_PASS
 
 check_data_information() {
     local variable="$1"
