@@ -11,7 +11,8 @@ source ~/.bashrc
 
 ### Créer le fichier .env
 A la racine du projet : 
-`cp .env.dev .env`
+`cp ./scripts/influxdb/.env.dev ./scripts/influxdb/.env`  
+
 Compléter les entrées.
 
 ## Utilisation
