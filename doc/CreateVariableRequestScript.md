@@ -8,6 +8,7 @@ sudo apt udpate -y && sudo apt install mssql-tools18 unixodbc-dev
 echo 'export PATH="$PATH:/opt/mssql-tools18/bin"' >> ~/.bashrc
 source ~/.bashrc
 ```
+Pour plus d'informations sur l'installation : https://learn.microsoft.com/en-us/sql/linux/install-upgrade/setup-tools?view=sql-server-ver17&tabs=ubuntu-install%2Codbc-ubuntu-2404
 
 ### Créer le fichier .env
 A la racine du projet : 
