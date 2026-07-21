@@ -3,8 +3,8 @@
 # ==========================================
 # CONFIGURATION
 # ==========================================
-INFLUX_URL="http://172.19.0.7:8181"
-TOKEN="apiv3_IpAIoj59qRM7alo6ULE66SG1iO0tuJsCLOAjBOyoyIbqZPQpCLLbKmDAB6PVH0EsRC1GX6J9uqGzw1DzGupHBA"
+INFLUX_URL=""
+TOKEN=""
 SOURCE_DB="ephemeral"
 TARGET_DB="ephemeral"
 
@@ -15,7 +15,7 @@ END_TIME="2026-06-29T18:47:00.008Z"
 # Taille des paquets pour l'écriture (nombre de lignes par envoi HTTP)
 CHUNK_SIZE=20000
 
-SQL_QUERY="SELECT time, \"ASSET_UUID\", \"ID\", \"TAG\", \"TYPE\", \"VALUE\", \"TIMESTAMP\" FROM cnc_data WHERE \"ASSET_UUID\" = 'DUSTTRAK' AND time >= '$START_TIME' AND time < '$END_TIME'"
+SQL_QUERY="SELECT time, \"AssetUuid\", \"Id\", \"Tag\", \"Type\", \"Value\", \"CreatedAt\" FROM \"AssetsMetrics\" WHERE \"ASSET_UUID\" = 'DUSTTRAK' AND time >= '$START_TIME' AND time < '$END_TIME'"
 
 # Fichiers temporaires
 touch /tmp/influx_write_response.txt
@@ -91,7 +91,7 @@ with open("'"$RAW_RESPONSE"'", "r", encoding="utf-8") as infile, open("'"$PAYLOA
         val = val.replace("\"", "\\\"")
         
         # Formatage de la ligne
-        lp_line = f"cnc_data,ASSET_UUID={row[1]},ID={row[2]},TAG={row[3]},TYPE={row[4]} VALUE=\"{val}\",TIMESTAMP=\"{row[6]}\" {timestamp_ns}\n"
+        lp_line = f"AssetsMetrics,AssetUuid={row[1]},Id={row[2]},Tag={row[3]},Type={row[4]} Value=\"{val}\",CreatedAt=\"{row[6]}\" {timestamp_ns}\n"
         outfile.write(lp_line)
 '
 
