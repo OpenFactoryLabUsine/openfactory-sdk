@@ -1,12 +1,14 @@
 #!/bin/bash
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENV_FILE="$SCRIPT_DIR/.env"
+
 if [ -f "$ENV_FILE" ]; then
     export $(grep -v '^#' "$ENV_FILE" | xargs)
 else
     echo "[x] Fichier .env introuvable. Veuillez créer un fichier .env à la racine du projet avec les variables d'environnement nécessaires."
     exit 1
 fi
+
 # Configuration
 IS_AUTOMATED="false"
 WANTED_ASSET_UUID=${1:-""}
@@ -27,8 +29,9 @@ check_data_information() {
     local variable="$1"
     if [ -z "$variable" ]; then
         echo "[x] Vous devez fournir l'information requise. Veuillez réessayer."
-        exit 1
+        return 1
     fi
+    return 0
 }
 
 check_if_uns_data_exists() {
@@ -40,8 +43,9 @@ check_if_uns_data_exists() {
     fi
     if [ -z "$data" ]; then
         echo "[x] Aucune donnée correspondante trouvée dans UNS. Veuillez vérifier vos entrées."
-        exit 1
+        return 1
     fi
+    return 0
 }
 
 update_uns() {
@@ -55,7 +59,6 @@ update_uns() {
 }
 
 get_uns_data() {
-    clear
     local SQL_QUERY="$1"
     data=$(sqlcmd -S "$DB_SERVER" -d "$DB_NAME" -U "$DB_USER" -P "$DB_PASS" -C -W -Q "$SQL_QUERY" 2>/dev/null)
     if [ $? -ne 0 ]; then
@@ -69,72 +72,100 @@ check_if_data_is_integer() {
     local variable="$1"
     if ! [[ "$variable" =~ ^[0-9]+$ ]]; then
         echo "[x] La valeur fournie n'est pas un entier valide. Veuillez réessayer."
-        exit 1
+        return 1
     fi
+    return 0
 }
 
 check_if_data_is_timestamp() {
     local variable="$1"
     if ! [[ "$variable" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}$ ]]; then
         echo "[x] La valeur fournie n'est pas un timestamp valide. Veuillez réessayer."
-        exit 1
+        return 1
     fi
+    return 0
 }
 
-if [ $WANTED_ASSET_UUID ]; then
+if [ -n "$WANTED_ASSET_UUID" ]; then
     IS_AUTOMATED="true"
 fi
 
 if [ "$IS_AUTOMATED" == "true" ]; then
-  echo "Mode automatique"
+    echo "Mode automatique"
 else
-  clear
-  echo "Mode manuel"
+    clear
+    echo "Mode manuel"
 
-  echo "--- Sélection de l'équipement Uuid à enregistrer ---"
-  get_uns_data "SET NOCOUNT ON; SELECT AssetUuid FROM Equipment;"
+    echo "--- Sélection de l'équipement Uuid à enregistrer ---"
+    get_uns_data "SET NOCOUNT ON; SELECT AssetUuid FROM Equipment;"
+    while true; do
+        read -p "[Obligatoire] Entrez l'UUID de l'équipement souhaité : " WANTED_ASSET_UUID
+        # Si la fonction retourne 1 (erreur), "|| continue" renvoie au début de la boucle
+        check_data_information "$WANTED_ASSET_UUID" || continue
+        check_if_uns_data_exists "SET NOCOUNT ON; SELECT id FROM Equipment WHERE AssetUuid = '$WANTED_ASSET_UUID';" || continue
+        break # Sortie de la boucle si tout est OK
+    done
 
-  read -p "[Obligatoire] Entrez l'UUID de l'équipement souhaité : " WANTED_ASSET_UUID
-  check_data_information "$WANTED_ASSET_UUID"
-  check_if_uns_data_exists "SET NOCOUNT ON; SELECT id FROM Equipment WHERE AssetUuid = '$WANTED_ASSET_UUID';"
+    clear
 
-  echo -e "\n --- Sélection de la variable à enregistrer ---"
-  get_uns_data "SET NOCOUNT ON; SELECT Nom FROM Variable WHERE EquipmentId IN (SELECT id FROM Equipment WHERE AssetUuid = '$WANTED_ASSET_UUID');"
+    echo -e "\n --- Sélection de la variable à enregistrer ---"
+    get_uns_data "SET NOCOUNT ON; SELECT Nom FROM Variable WHERE EquipmentId IN (SELECT id FROM Equipment WHERE AssetUuid = '$WANTED_ASSET_UUID');"
 
-  read -p "[Facultatif] Entrez le nom de la variable pour n'enregistrer qu'un capteur spécifique de l'équipement sélectionné : " 'WANTED_VARIABLE_NAME_RESPONSE'
-  if [ -n "$WANTED_VARIABLE_NAME_RESPONSE" ]; then
-    WANTED_VARIABLE_NAME="'$WANTED_VARIABLE_NAME_RESPONSE'"
-    check_if_uns_data_exists "SET NOCOUNT ON; SELECT Nom FROM Variable WHERE Nom = $WANTED_VARIABLE_NAME AND EquipmentId IN (SELECT id FROM Equipment WHERE AssetUuid = '$WANTED_ASSET_UUID');"
-  else
-    WANTED_VARIABLE_NAME="NULL"
-  fi
+    while true; do
+        read -p "[Facultatif] Entrez le nom de la variable pour n'enregistrer qu'un capteur spécifique de l'équipement sélectionné : " WANTED_VARIABLE_NAME_RESPONSE
+        if [ -n "$WANTED_VARIABLE_NAME_RESPONSE" ]; then
+            WANTED_VARIABLE_NAME="'$WANTED_VARIABLE_NAME_RESPONSE'"
+            check_if_uns_data_exists "SET NOCOUNT ON; SELECT Nom FROM Variable WHERE Nom = $WANTED_VARIABLE_NAME AND EquipmentId IN (SELECT id FROM Equipment WHERE AssetUuid = '$WANTED_ASSET_UUID');" || continue
+        else
+            WANTED_VARIABLE_NAME="NULL"
+        fi
+        break
+    done
 
-  clear
+    clear
 
-  read -p "[Obligatoire] Entrez l'heure de début d'enregistrement dans votre TimeZone (format: YYYY-MM-DDTHH:MM:SS) (exemple: 2026-06-26T13:15:17) : " LOCAL_START_TIME
-  check_data_information "$LOCAL_START_TIME"
-  check_if_data_is_timestamp "$LOCAL_START_TIME"
+    while true; do
+        read -p "[Obligatoire] Entrez l'heure de début d'enregistrement dans votre TimeZone (format: YYYY-MM-DDTHH:MM:SS) (exemple: 2026-06-26T13:15:17) : " LOCAL_START_TIME
+        check_data_information "$LOCAL_START_TIME" || continue
+        check_if_data_is_timestamp "$LOCAL_START_TIME" || continue
+        break
+    done
 
-  read -p "[Obligatoire] Entrez l'heure de fin d'enregistrement dans votre TimeZone (format: YYYY-MM-DDTHH:MM:SS) (exemple: 2026-06-26T13:15:17) : " LOCAL_END_TIME
-  check_data_information "$LOCAL_END_TIME"
-  check_if_data_is_timestamp "$LOCAL_END_TIME"
+    clear
 
-  read -p "[Facultatif] Entrez votre TimeZone (exemple: America/Toronto) (défaut: America/Toronto) : " TIME_ZONE
-  if [ -z "$TIME_ZONE" ]; then
-    TIME_ZONE="America/Toronto"
-  fi
-  if ! [[ "$TIME_ZONE" =~ ^[A-Za-z]+/[A-Za-z_-]+$ ]]; then
-    echo "[x] La valeur fournie n'est pas un TimeZone valide. Veuillez réessayer."
-    exit 1
-  fi
+    while true; do
+        read -p "[Obligatoire] Entrez l'heure de fin d'enregistrement dans votre TimeZone (format: YYYY-MM-DDTHH:MM:SS) (exemple: 2026-06-26T13:15:17) : " LOCAL_END_TIME
+        check_data_information "$LOCAL_END_TIME" || continue
+        check_if_data_is_timestamp "$LOCAL_END_TIME" || continue
+        break
+    done
 
-  read -p "[Obligatoire] Entrez le temps de buffer (en secondes) (exemple: 120) : " BUFFER_TIME
-  check_data_information "$BUFFER_TIME"
-  check_if_data_is_integer "$BUFFER_TIME"
+    while true; do
+        read -p "[Facultatif] Entrez votre TimeZone (exemple: America/Toronto) (défaut: America/Toronto) : " TIME_ZONE
+        if [ -z "$TIME_ZONE" ]; then
+            TIME_ZONE="America/Toronto"
+        fi
+        
+        if ! [[ "$TIME_ZONE" =~ ^[A-Za-z]+/[A-Za-z_-]+$ ]]; then
+            echo "[x] La valeur fournie n'est pas un TimeZone valide. Veuillez réessayer."
+            continue
+        fi
+        break
+    done
 
-  read -p "[Obligatoire] Entrez le MPS (mesures par seconde) (en secondes) (exemple: 60) : " MPS
-  check_data_information "$MPS"
-  check_if_data_is_integer "$MPS"
+    while true; do
+        read -p "[Obligatoire] Entrez le temps de buffer (en secondes) (exemple: 120) : " BUFFER_TIME
+        check_data_information "$BUFFER_TIME" || continue
+        check_if_data_is_integer "$BUFFER_TIME" || continue
+        break
+    done
+
+    while true; do
+        read -p "[Obligatoire] Entrez le MPS (mesures par seconde) (en secondes) (exemple: 60) : " MPS
+        check_data_information "$MPS" || continue
+        check_if_data_is_integer "$MPS" || continue
+        break
+    done
 fi
 
 echo "Création de la demande d'enregistrement de variable dans UNS..."
