@@ -11,8 +11,8 @@ fi
 
 # Configuration
 IS_AUTOMATED="false"
-WANTED_ASSET_UUID=${1:-""}
-WANTED_VARIABLE_NAME=${2:-"NULL"}
+UNS_EQUIPMENT_ID=${1:-"NULL"}
+UNS_VARIABLE_ID=${2:-"NULL"}
 LOCAL_START_TIME=${3:-""}
 LOCAL_END_TIME=${4:-""}
 MPS=${5:-""}
@@ -42,9 +42,10 @@ check_if_uns_data_exists() {
         exit 1
     fi
     if [ -z "$data" ]; then
-        echo "[x] Aucune donnée correspondante trouvée dans UNS. Veuillez vérifier vos entrées."
+        echo "[x] Aucune donnée correspondante trouvée dans UNS. Veuillez vérifier vos entrées." >&2
         return 1
     fi
+    echo "$data"
     return 0
 }
 
@@ -86,7 +87,7 @@ check_if_data_is_timestamp() {
     return 0
 }
 
-if [ -n "$WANTED_ASSET_UUID" ]; then
+if [ "$UNS_EQUIPMENT_ID" != "NULL" ]; then
     IS_AUTOMATED="true"
 fi
 
@@ -96,28 +97,36 @@ else
     clear
     echo "Mode manuel"
 
-    echo "--- Sélection de l'équipement Uuid à enregistrer ---"
-    get_uns_data "SET NOCOUNT ON; SELECT AssetUuid FROM Equipment;"
+    echo "--- Sélection du nom de l'équipement à enregistrer ---"
+    get_uns_data "SET NOCOUNT ON; SELECT UnsEquipmentName FROM Equipment;"
     while true; do
-        read -p "[Obligatoire] Entrez l'UUID de l'équipement souhaité : " WANTED_ASSET_UUID
+        read -p "[Facultatif] Entrez le nom de l'équipement souhaité : " UNS_EQUIPMENT_NAME_RESPONSE
         # Si la fonction retourne 1 (erreur), "|| continue" renvoie au début de la boucle
-        check_data_information "$WANTED_ASSET_UUID" || continue
-        check_if_uns_data_exists "SET NOCOUNT ON; SELECT id FROM Equipment WHERE AssetUuid = '$WANTED_ASSET_UUID';" || continue
+        if [ -n "$UNS_EQUIPMENT_NAME_RESPONSE" ]; then
+            UNS_EQUIPMENT_ID=$(check_if_uns_data_exists "SET NOCOUNT ON; SELECT Id FROM Equipment WHERE UnsEquipmentName = '$UNS_EQUIPMENT_NAME_RESPONSE';") || continue
+        else
+            UNS_EQUIPMENT_ID="NULL"
+        fi
         break # Sortie de la boucle si tout est OK
     done
 
-    clear
 
     echo -e "\n --- Sélection de la variable à enregistrer ---"
-    get_uns_data "SET NOCOUNT ON; SELECT Nom FROM Variable WHERE EquipmentId IN (SELECT id FROM Equipment WHERE AssetUuid = '$WANTED_ASSET_UUID');"
+    if [ "$UNS_EQUIPMENT_ID" != "NULL" ]; then
+        get_uns_data "SET NOCOUNT ON; SELECT UnsVariableName FROM Variable WHERE EquipmentId = $UNS_EQUIPMENT_ID;"
+    else
+        get_uns_data "SET NOCOUNT ON; SELECT UnsVariableName FROM Variable;"
+    fi
 
     while true; do
-        read -p "[Facultatif] Entrez le nom de la variable pour n'enregistrer qu'un capteur spécifique de l'équipement sélectionné : " WANTED_VARIABLE_NAME_RESPONSE
-        if [ -n "$WANTED_VARIABLE_NAME_RESPONSE" ]; then
-            WANTED_VARIABLE_NAME="'$WANTED_VARIABLE_NAME_RESPONSE'"
-            check_if_uns_data_exists "SET NOCOUNT ON; SELECT Nom FROM Variable WHERE Nom = $WANTED_VARIABLE_NAME AND EquipmentId IN (SELECT id FROM Equipment WHERE AssetUuid = '$WANTED_ASSET_UUID');" || continue
+        read -p "[Facultatif] Entrez le nom de la variable pour n'enregistrer qu'un capteur spécifique de l'équipement sélectionné : " UNS_VARIABLE_NAME_RESPONSE
+        echo "UNS_VARIABLE_NAME_RESPONSE: $UNS_VARIABLE_NAME_RESPONSE"
+        if [[ -n "$UNS_VARIABLE_NAME_RESPONSE" && "$UNS_EQUIPMENT_ID" != "NULL" ]]; then
+            UNS_VARIABLE_ID=$(check_if_uns_data_exists "SET NOCOUNT ON; SELECT Id FROM Variable WHERE UnsVariableName = '$UNS_VARIABLE_NAME_RESPONSE' AND EquipmentId = $UNS_EQUIPMENT_ID;") || continue
+        elif [[ -n "$UNS_VARIABLE_NAME_RESPONSE" && "$UNS_EQUIPMENT_ID" == "NULL" ]]; then
+            UNS_VARIABLE_ID=$(check_if_uns_data_exists "SET NOCOUNT ON; SELECT Id FROM Variable WHERE UnsVariableName = '$UNS_VARIABLE_NAME_RESPONSE';") || continue
         else
-            WANTED_VARIABLE_NAME="NULL"
+            UNS_VARIABLE_ID="NULL"
         fi
         break
     done
@@ -134,9 +143,13 @@ else
     clear
 
     while true; do
-        read -p "[Obligatoire] Entrez l'heure de fin d'enregistrement dans votre TimeZone (format: YYYY-MM-DDTHH:MM:SS) (exemple: 2026-06-26T13:15:17) : " LOCAL_END_TIME
-        check_data_information "$LOCAL_END_TIME" || continue
-        check_if_data_is_timestamp "$LOCAL_END_TIME" || continue
+        read -p "[Facultatif] Entrez l'heure de fin d'enregistrement dans votre TimeZone (format: YYYY-MM-DDTHH:MM:SS) (exemple: 2026-06-26T13:15:17) : " LOCAL_END_TIME
+        if [ -z "$LOCAL_END_TIME" ]; then
+            LOCAL_END_TIME="NULL"
+        else
+            check_if_data_is_timestamp "$LOCAL_END_TIME" || continue
+            LOCAL_END_TIME="'$LOCAL_END_TIME'"
+        fi
         break
     done
 
@@ -161,15 +174,20 @@ else
     done
 
     while true; do
-        read -p "[Obligatoire] Entrez le MPS (mesures par seconde) (en secondes) (exemple: 60) : " MPS
-        check_data_information "$MPS" || continue
-        check_if_data_is_integer "$MPS" || continue
+        read -p "[Facultatif] Entrez le MPS (mesures par seconde) (en secondes) (exemple: 60) : " MPS
+        if [ -z "$MPS" ]; then
+            MPS="NULL"
+        else
+            check_if_data_is_integer "$MPS" || continue
+            MPS="$MPS"
+        fi
         break
     done
 fi
 
 echo "Création de la demande d'enregistrement de variable dans UNS..."
-update_uns "INSERT INTO VariableRecordingRequest (WantedVariableName, WantedAssetUuid, Statut, LocalStartTime, LocalEndTime, Mps, BufferTime, TimeZone) VALUES ($WANTED_VARIABLE_NAME, '$WANTED_ASSET_UUID', 'Planned', '$LOCAL_START_TIME', '$LOCAL_END_TIME', '$MPS', '$BUFFER_TIME', '$TIME_ZONE');"
+message=$(update_uns "INSERT INTO VariableRecordingRequest (EquipmentId, VariableId, Statut, LocalStartTime, LocalEndTime, Mps, BufferTime, TimeZone) VALUES ($UNS_EQUIPMENT_ID, $UNS_VARIABLE_ID, 'Planned', '$LOCAL_START_TIME', $LOCAL_END_TIME, $MPS, '$BUFFER_TIME', '$TIME_ZONE');")
+echo "$message"
 if [ $? -ne 0 ]; then
     echo "[x] Impossible de joindre SQL Server pour ajouter la demande d'enregistrement." >&2
     exit 1
