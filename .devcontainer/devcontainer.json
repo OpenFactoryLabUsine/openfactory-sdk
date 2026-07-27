@@ -1,5 +1,6 @@
 {
   "name": "OpenFactory-SDK Dev Container",
+  "initializeCommand": "node .devcontainer/generate_env.js",
   "build": {
     "dockerfile": "Dockerfile",
     "context": ".",
@@ -29,11 +30,27 @@
     "ENVIRONMENT": "local",
     "OPENFACTORY_UNS_SCHEMA": "/workspaces/openfactory-sdk/.devcontainer/uns.yml"
   },
-  "forwardPorts": [80, 3000, 9090, 12345],
+  "forwardPorts": [80, 8888, 8181, 9092, 9094, 3000, 9090, 12345],
   "portsAttributes": {
     "80": {
       "label": "Traefik",
       "onAutoForward": "openBrowser"
+    },
+    "8888": {
+      "label": "Influx Explorer",
+      "onAutoForward": "openBrowser"
+    },
+    "8181": {
+      "label": "InfluxDB",
+      "onAutoForward": "openBrowser"
+    },
+    "9092": {
+      "label": "Kafka",
+      "onAutoForward": "silent"
+    },
+    "9094": {
+      "label": "Kafka external",
+      "onAutoForward": "silent"
     },
     "3000": {
       "label": "Grafana",
@@ -46,6 +63,12 @@
     "12345": {
       "label": "Grafana Alloy",
       "onAutoForward": "openBrowser"
+    },
+    "otherPortsAttributes": {
+      "onAutoForward": "silent"
+    },
+    "settings": {
+      "remote.localPortHost": "allInterfaces"
     }
   },
   "postCreateCommand": "pip install -e /workspaces/openfactory-sdk[dev]",
