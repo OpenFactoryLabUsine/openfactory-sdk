@@ -12,6 +12,7 @@ else
     echo "[x] Fichier .env introuvable. Veuillez créer un fichier .env à la racine du projet avec les variables d'environnement nécessaires." | tee -a "$LOG_FILE"
     exit 1
 fi
+
 # Configuration
 INFLUX_URL=$INFLUX_URL
 INFLUX_TOKEN=$INFLUX_TOKEN
@@ -23,14 +24,18 @@ CHUNK_SIZE=$CHUNK_SIZE
 START_TS=$(date +%s)
 VAR_CONDITION=""
 UNWANTED_TAGS="('Application.License', 'Method', 'Method.Command', 'Library.License')"
+
 # Configuration UNS
 DB_SERVER=$DB_SERVER
 DB_NAME=$DB_NAME
 DB_USER=$DB_USER
 DB_PASS=$DB_PASS
+
 # Variables qui vont être mises à jour
 LAST_TIME=""
 END_BUFFER_TIME_LOCAL=""
+USE_MPS=false
+
 # Variables pour l'UNS
 STATUT="InProgress"
 TRANSFERT_START_TIME_UTC=$(date -u +"%Y-%m-%dT%H:%M:%S")
@@ -45,6 +50,7 @@ WANTED_ASSET_UUID="NULL"
 UNS_EQUIPMENT_NAME="NULL"
 WANTED_DATA_ITEM_ID="NULL"
 UNS_VARIABLE_NAME="NULL"
+
 # Paramètre
 VARIABLE_RECORDING_REQUEST_ID="${1:-""}" # Obligatoire
 
@@ -63,7 +69,6 @@ dialog_with_uns() {
     
     if [ $? -ne 0 ]; then
         if [ "$IS_FROM_ERROR_HANDLER" = "true" ]; then
-            # Si l'erreur se produit PENDANT qu'on écrit les logs d'erreur, on affiche la cause et on coupe pour éviter une boucle.
             echo "[x] Erreur fatale de SQL Server lors de l'enregistrement des logs (UPDATE/INSERT) :" | tee -a "$LOG_FILE"
             echo "$sql_output" | tee -a "$LOG_FILE"
             exit 1
@@ -73,7 +78,6 @@ dialog_with_uns() {
     fi
 }
 
-# Fonction de gestion des erreurs
 handle_error() {
     local msg="$1"
     local is_uns_connexion_error="${2:-"false"}"
@@ -82,10 +86,10 @@ handle_error() {
     SQL_ERR_MSG="'${msg//\'/\'\'}'"
     TRANSFERT_END_TIME_UTC=$(date -u +"%Y-%m-%dT%H:%M:%S")
     DURATION=$(( $(date +%s) - START_TS ))
+    
     if [ "$is_uns_connexion_error" = "true" ]; then
         exit 1
     else
-        # On ajoute le 3ème paramètre "true" pour dire à dialog_with_uns de ne pas relancer handle_error si ça plante.
         dialog_with_uns "UPDATE VariableRecordingRequest SET Statut = 'Failed' WHERE id = '${VARIABLE_RECORDING_REQUEST_ID}';" "" "true"
         dialog_with_uns "INSERT INTO VariableRecordingLogs (VariableRecordingRequestId, UnsEquipmentName, OpenFactoryAssetUuid, UnsVariableName, OpenFactoryDataItemId, TransfertStartTime, TransfertEndTime, Duration, TotalNumberLinesTransfered, NumberLinesTransferedDuringBuffer, ErrorMessage) VALUES ('${VARIABLE_RECORDING_REQUEST_ID}', ${UNS_EQUIPMENT_NAME}, ${WANTED_ASSET_UUID}, ${UNS_VARIABLE_NAME}, ${WANTED_DATA_ITEM_ID}, '${TRANSFERT_START_TIME_UTC}', '${TRANSFERT_END_TIME_UTC}', '${DURATION}', '${TOTAL_NUMBER_LINES_TRANSFERRED}', '${BUFFER_NUMBER_LINES_TRANSFERRED}', ${SQL_ERR_MSG});" "" "true"
     fi
@@ -95,9 +99,10 @@ handle_error() {
 check_if_uns_data_exists() {
     local SQL_QUERY="$1"
     local VAR_TO_ASSIGN="$2"
-    local ERR_MSG_CONN="${3:-Impossible de joindre SQL Server ou requête invalide.}"
-    local ERR_MSG_EMPTY="${4:-Aucune donnée correspondante trouvée dans UNS. Veuillez vérifier vos entrées.}"
+    local ERR_MSG_CONN="${3:-"Impossible de joindre SQL Server ou requête invalide."}"
+    local ERR_MSG_EMPTY="${4:-"Aucune donnée correspondante trouvée dans UNS. Veuillez vérifier vos entrées."}"
     local fetched_data
+    
     fetched_data=$(sqlcmd -S "$DB_SERVER" -d "$DB_NAME" -U "$DB_USER" -P "$DB_PASS" -C -b -h -1 -W -Q "$SQL_QUERY" 2>/dev/null)
     if [ $? -ne 0 ]; then
         handle_error "$ERR_MSG_CONN" "true"
@@ -109,7 +114,6 @@ check_if_uns_data_exists() {
     printf -v "$VAR_TO_ASSIGN" "%s" "$fetched_data"
 }
 
-# Fonction pour récupérer les données de la demande d'enregistrement de variable depuis l'UNS
 get_variable_recording_request_data() {
     local query="SET NOCOUNT ON; SELECT COALESCE(CAST(EquipmentId AS VARCHAR), 'NULL_VALUE'), COALESCE(CAST(VariableId AS VARCHAR), 'NULL_VALUE'), Statut, LocalStartTime, LocalEndTime, Mps, BufferTime, TimeZone FROM VariableRecordingRequest WHERE id = '$VARIABLE_RECORDING_REQUEST_ID';"
     data=$(sqlcmd -S "$DB_SERVER" -d "$DB_NAME" -U "$DB_USER" -P "$DB_PASS" -C -b -h -1 -W -s "|" -Q "$query" 2>/dev/null)
@@ -118,76 +122,74 @@ get_variable_recording_request_data() {
     fi
     IFS='|' read -r WANTED_EQUIPMENT_ID WANTED_VARIABLE_ID STATUT LOCAL_START_TIME LOCAL_END_TIME MPS BUFFER_TIME TIMEZONE <<< "$data"
 
-    # Vérification des données récupérées
-    if [[ "$WANTED_VARIABLE_ID" == 'NULL_VALUE' && "$WANTED_EQUIPMENT_ID" == 'NULL_VALUE' ]]; then
-        handle_error "La demande d'enregistrement de variable avec l'ID $VARIABLE_RECORDING_REQUEST_ID ne contient ni EquipmentId ni VariableId. Veuillez vérifier les entrées dans l'UNS." "true" 
-    elif [[ "$WANTED_VARIABLE_ID" != 'NULL_VALUE' && "$WANTED_EQUIPMENT_ID" != 'NULL_VALUE' ]]; then
-        check_if_uns_data_exists "SET NOCOUNT ON; SELECT Id FROM Equipment WHERE Id = '$WANTED_EQUIPMENT_ID';" "WANTED_EQUIPMENT_ID"
-        check_if_uns_data_exists "SET NOCOUNT ON; SELECT Id FROM Variable WHERE Id = '$WANTED_VARIABLE_ID' AND EquipmentId = '$WANTED_EQUIPMENT_ID';" "WANTED_VARIABLE_ID" "Erreur de connexion." "Variable $WANTED_VARIABLE_ID introuvable pour l'équipement $WANTED_EQUIPMENT_ID."
-        echo "EQUIPMENT_ID if 2 : $WANTED_EQUIPMENT_ID"
-        echo "VARIABLE_ID if 2 : $WANTED_VARIABLE_ID"
-    elif [ "$WANTED_EQUIPMENT_ID" != 'NULL_VALUE' ]; then
-        check_if_uns_data_exists "SET NOCOUNT ON; SELECT Id FROM Equipment WHERE Id = '$WANTED_EQUIPMENT_ID';" "WANTED_EQUIPMENT_ID"
-        echo "EQUIPMENT_ID if equipment: $WANTED_EQUIPMENT_ID" 
-    elif [ "$WANTED_VARIABLE_ID" != 'NULL_VALUE' ]; then
-        check_if_uns_data_exists "SET NOCOUNT ON; SELECT Id FROM Variable WHERE Id = '$WANTED_VARIABLE_ID';" "WANTED_VARIABLE_ID"
-        echo "VARIABLE_ID if variable: $WANTED_VARIABLE_ID"
+    # Vérification et Activation de la limite MPS
+    MPS=$(echo "$MPS" | tr -d ' ' | tr -d '\r' | tr -d '\n')
+    if [[ "$MPS" == "NULL" || "$MPS" == "NULL_VALUE" || -z "$MPS" || ! "$MPS" =~ ^[0-9]+$ || "$MPS" -eq 0 ]]; then
+        USE_MPS=false
+    else
+        USE_MPS=true
     fi
 
-if [[ "$WANTED_EQUIPMENT_ID" != 'NULL_VALUE' ]]; then
+    # Vérification des IDs
+    if [[ "$WANTED_VARIABLE_ID" == 'NULL_VALUE' && "$WANTED_EQUIPMENT_ID" == 'NULL_VALUE' ]]; then
+        handle_error "La demande d'enregistrement avec l'ID $VARIABLE_RECORDING_REQUEST_ID ne contient ni EquipmentId ni VariableId." "true" 
+    elif [[ "$WANTED_VARIABLE_ID" != 'NULL_VALUE' && "$WANTED_EQUIPMENT_ID" != 'NULL_VALUE' ]]; then
+        check_if_uns_data_exists "SET NOCOUNT ON; SELECT Id FROM Equipment WHERE Id = '$WANTED_EQUIPMENT_ID';" "WANTED_EQUIPMENT_ID"
+        check_if_uns_data_exists "SET NOCOUNT ON; SELECT Id FROM Variable WHERE Id = '$WANTED_VARIABLE_ID' AND EquipmentId = '$WANTED_EQUIPMENT_ID';" "WANTED_VARIABLE_ID" "Erreur." "Variable introuvable pour cet équipement."
+    elif [ "$WANTED_EQUIPMENT_ID" != 'NULL_VALUE' ]; then
+        check_if_uns_data_exists "SET NOCOUNT ON; SELECT Id FROM Equipment WHERE Id = '$WANTED_EQUIPMENT_ID';" "WANTED_EQUIPMENT_ID"
+    elif [ "$WANTED_VARIABLE_ID" != 'NULL_VALUE' ]; then
+        check_if_uns_data_exists "SET NOCOUNT ON; SELECT Id FROM Variable WHERE Id = '$WANTED_VARIABLE_ID';" "WANTED_VARIABLE_ID"
+    fi
+
+    # Récupération AssetUuid et Noms
+    if [[ "$WANTED_EQUIPMENT_ID" != 'NULL_VALUE' ]]; then
         local raw_uuid=""
         local raw_eq_name=""
-        check_if_uns_data_exists "SET NOCOUNT ON; SELECT OpenFactoryAssetUuid FROM Equipment WHERE Id = '$WANTED_EQUIPMENT_ID';" "raw_uuid" "Erreur de connexion." "Impossible de récupérer OpenFactoryAssetUuid."
+        check_if_uns_data_exists "SET NOCOUNT ON; SELECT OpenFactoryAssetUuid FROM Equipment WHERE Id = '$WANTED_EQUIPMENT_ID';" "raw_uuid"
         INFLUX_ASSET_UUID="$raw_uuid"
         WANTED_ASSET_UUID="'${raw_uuid//\'/\'\'}'"
-        check_if_uns_data_exists "SET NOCOUNT ON; SELECT UnsEquipmentName FROM Equipment WHERE Id = '$WANTED_EQUIPMENT_ID';" "raw_eq_name" "Erreur de connexion." "Impossible de récupérer UnsEquipmentName."
+        
+        check_if_uns_data_exists "SET NOCOUNT ON; SELECT UnsEquipmentName FROM Equipment WHERE Id = '$WANTED_EQUIPMENT_ID';" "raw_eq_name"
         UNS_EQUIPMENT_NAME="'${raw_eq_name//\'/\'\'}'"
     else
         INFLUX_ASSET_UUID="NULL"
     fi
+    
     if [[ "$WANTED_VARIABLE_ID" != 'NULL_VALUE' ]]; then
         local raw_data_id=""
         local raw_var_name=""
-        check_if_uns_data_exists "SET NOCOUNT ON; SELECT OpenFactoryDataItemId FROM Variable WHERE Id = '$WANTED_VARIABLE_ID';" "raw_data_id" "Erreur de connexion." "Impossible de récupérer OpenFactoryDataItemId."
+        check_if_uns_data_exists "SET NOCOUNT ON; SELECT OpenFactoryDataItemId FROM Variable WHERE Id = '$WANTED_VARIABLE_ID';" "raw_data_id"
         INFLUX_DATA_ITEM_ID="$raw_data_id"
         WANTED_DATA_ITEM_ID="'${raw_data_id//\'/\'\'}'"
-        check_if_uns_data_exists "SET NOCOUNT ON; SELECT UnsVariableName FROM Variable WHERE Id = '$WANTED_VARIABLE_ID';" "raw_var_name" "Erreur de connexion." "Impossible de récupérer UnsVariableName."
+        
+        check_if_uns_data_exists "SET NOCOUNT ON; SELECT UnsVariableName FROM Variable WHERE Id = '$WANTED_VARIABLE_ID';" "raw_var_name"
         UNS_VARIABLE_NAME="'${raw_var_name//\'/\'\'}'"
     else
         INFLUX_DATA_ITEM_ID="NULL"
     fi
 
     if [[ "$STATUT" = "Processed" || "$STATUT" = "InProgress" ]]; then
-        handle_error "La demande d'enregistrement de variable avec l'ID $VARIABLE_RECORDING_REQUEST_ID n'est pas en statut 'Planned', impossible de lancer le script. Statut actuel : $STATUT."
-    elif [[ -z "$LOCAL_END_TIME" ]]; then
-        handle_error "La date de fin locale ne peut pas être vide. Veuillez vérifier l'entrée dans l'UNS."
-    elif [[ "$LOCAL_END_TIME" < "$LOCAL_START_TIME" ]]; then
-        handle_error "La date de fin locale est antérieure à la date de début locale. Veuillez vérifier les entrées dans l'UNS."
-    elif ! [[ "$LOCAL_END_TIME" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}$ ]] || ! [[ "$LOCAL_START_TIME" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}$ ]]; then
-        handle_error "L'une des dates locales n'est pas au format attendu (YYYY-MM-DDTHH:MM:SS). Veuillez vérifier les entrées dans l'UNS."
+        handle_error "La demande est en statut $STATUT, impossible de lancer le script."
+    elif [[ -z "$LOCAL_END_TIME" || "$LOCAL_END_TIME" < "$LOCAL_START_TIME" || ! "$LOCAL_END_TIME" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}$ || ! "$LOCAL_START_TIME" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}$ ]]; then
+        handle_error "Dates locales invalides (incohérence ou format). Veuillez vérifier."
     fi
 }
 get_variable_recording_request_data
 
-# Fonction pour compter le nombre de lignes à transférer depuis la DB SOURCE vers la DB TARGET
 count_number_lines(){
     local sql_query=$1
     RESPONSE_COUNT_DATA=$("$SCRIPT_DIR/simple_request.sh" "$INFLUX_URL" "$INFLUX_TOKEN" "$SOURCE_DB" "$sql_query")
-    if [ $? -ne 0 ]; then
-        handle_error "[x] Erreur d'une requête sur influxdb3 (script simple_request.sh)."
-    fi
+    if [ $? -ne 0 ]; then handle_error "[x] Erreur requête count influxdb3."; fi
 }
 
-# Fonction pour transférer les données de la DB SOURCE vers la DB TARGET
 transfert_data(){
     local sql_query=$1
     "$SCRIPT_DIR/data_transfert.sh" "$INFLUX_URL" "$INFLUX_TOKEN" "$SOURCE_DB" "$TARGET_DB" "$sql_query" "$CHUNK_SIZE" "$TARGET_TABLE"
-    if [ $? -ne 0 ]; then
-        handle_error "[x] Erreur lors du transfert des données (script data_transfert.sh)."
-    fi
+    if [ $? -ne 0 ]; then handle_error "[x] Erreur transfert data_transfert.sh."; fi
 }
 
-# Permet de modifier dynamiquement la condition des requêtes SQL
+# Construction dynamique de VAR_CONDITION
 if [[ "$INFLUX_ASSET_UUID" != "NULL" && "$INFLUX_DATA_ITEM_ID" != "NULL" ]]; then
     VAR_CONDITION="WHERE \"AssetUuid\" = '$INFLUX_ASSET_UUID' AND \"Id\" = '$INFLUX_DATA_ITEM_ID' AND \"Tag\" NOT IN $UNWANTED_TAGS" 
 elif [[ "$INFLUX_ASSET_UUID" != "NULL" ]]; then
@@ -196,71 +198,89 @@ elif [[ "$INFLUX_DATA_ITEM_ID" != "NULL" ]]; then
     VAR_CONDITION="WHERE \"Id\" = '$INFLUX_DATA_ITEM_ID' AND \"Tag\" NOT IN $UNWANTED_TAGS"
 fi
 
-# 1) Mettre à jour le Statut dans l'UNS vers InProgress TODO
-dialog_with_uns "UPDATE VariableRecordingRequest SET Statut = 'InProgress' WHERE id = '$VARIABLE_RECORDING_REQUEST_ID';" "Impossible de joindre SQL Server pour Modifier le statut à InProgress."
+# 1) Mettre à jour le Statut dans l'UNS vers InProgress
+dialog_with_uns "UPDATE VariableRecordingRequest SET Statut = 'InProgress' WHERE id = '$VARIABLE_RECORDING_REQUEST_ID';" "Impossible de Modifier le statut à InProgress."
 
-# 2) Convertir les heures locales récupérées de la VariableRecordingRequest en UTC pour la requête SQL
+# 2) Convertir les heures locales en UTC
 EPOCH_START=$(TZ="$TIMEZONE" date -d "${LOCAL_START_TIME/T/ }" +"%s")
 EPOCH_END=$(TZ="$TIMEZONE" date -d "${LOCAL_END_TIME/T/ }" +"%s")
 START_TIME_UTC=$(date -u -d "@$EPOCH_START" +"%Y-%m-%dT%H:%M:%SZ")
 END_TIME_UTC=$(date -u -d "@$EPOCH_END" +"%Y-%m-%dT%H:%M:%SZ")
 
-echo "[~] Début du script à $(TZ="$TIMEZONE" date "+%H:%M:%S") heure locale ($TIMEZONE) pour le VariableRecordingRequest ID : $VARIABLE_RECORDING_REQUEST_ID, l'AssetUuid : $WANTED_ASSET_UUID et le VariableDataItemId : $WANTED_DATA_ITEM_ID, période de transfert de $START_TIME_UTC UTC à $END_TIME_UTC UTC." | tee -a "$LOG_FILE"
+BASE_WHERE_CLAUSE="$VAR_CONDITION AND \"CreatedAt\" >= '$START_TIME_UTC' AND \"CreatedAt\" <= '$END_TIME_UTC'"
 
-# 3) Compatage du nombre de lignes à transférer
-count_number_lines "SELECT COUNT(\"AssetUuid\") AS total_count FROM \"$SOURCE_TABLE\" $VAR_CONDITION AND \"CreatedAt\" >= '$START_TIME_UTC' AND \"CreatedAt\" <= '$END_TIME_UTC'"
+build_queries() {
+    local extra_condition="$1"
+    local current_where="$BASE_WHERE_CLAUSE"
+    if [ -n "$extra_condition" ]; then
+        current_where="$current_where AND $extra_condition"
+    fi
+    
+    if [ "$USE_MPS" = true ]; then
+        # On utilise ROW_NUMBER() et DATE_BIN() pour ne garder que $MPS éléments par seconde
+        CURRENT_COUNT_QUERY="SELECT COUNT(\"AssetUuid\") AS total_count FROM (SELECT \"AssetUuid\", ROW_NUMBER() OVER(PARTITION BY \"AssetUuid\", \"Id\", \"Tag\", DATE_BIN(INTERVAL '1 second', time) ORDER BY time) as rn FROM \"$SOURCE_TABLE\" $current_where) WHERE rn <= $MPS"
+        CURRENT_TRANSFER_QUERY="SELECT epoch_ns, \"AssetUuid\", \"Id\", \"Tag\", \"Type\", \"Value\", \"CreatedAt\" FROM (SELECT CAST(arrow_cast(time, 'Int64') AS VARCHAR) AS epoch_ns, \"AssetUuid\", \"Id\", \"Tag\", \"Type\", CAST(\"Value\" AS VARCHAR) AS \"Value\", CAST(\"CreatedAt\" AS VARCHAR) AS \"CreatedAt\", ROW_NUMBER() OVER(PARTITION BY \"AssetUuid\", \"Id\", \"Tag\", DATE_BIN(INTERVAL '1 second', time) ORDER BY time) as rn FROM \"$SOURCE_TABLE\" $current_where) WHERE rn <= $MPS"
+    else
+        CURRENT_COUNT_QUERY="SELECT COUNT(\"AssetUuid\") AS total_count FROM \"$SOURCE_TABLE\" $current_where"
+        CURRENT_TRANSFER_QUERY="SELECT CAST(arrow_cast(time, 'Int64') AS VARCHAR) AS epoch_ns, \"AssetUuid\", \"Id\", \"Tag\", \"Type\", CAST(\"Value\" AS VARCHAR) AS \"Value\", CAST(\"CreatedAt\" AS VARCHAR) AS \"CreatedAt\" FROM \"$SOURCE_TABLE\" $current_where"
+    fi
+}
+
+echo "[~] Début du script. AssetUuid : $INFLUX_ASSET_UUID, VariableDataItemId : $INFLUX_DATA_ITEM_ID, période : $START_TIME_UTC à $END_TIME_UTC. (UTC)"  | tee -a "$LOG_FILE"
+if [ "$USE_MPS" = true ]; then echo "[~] Limite de données activée : Maximum $MPS mesures par seconde." | tee -a "$LOG_FILE"; fi
+
+# 3) Génération et exécution du comptage initial
+build_queries ""
+count_number_lines "$CURRENT_COUNT_QUERY"
 TOTAL_NUMBER_LINES_TRANSFERRED=$(echo "$RESPONSE_COUNT_DATA" | jq -r '.total_count // 0')
 
-# 4) Transfert des données de la DB SOURCE vers la DB TARGET
-echo "[~] Lancement du transfert de $TOTAL_NUMBER_LINES_TRANSFERRED lignes de la DB $SOURCE_DB vers la DB $TARGET_DB pour l'AssetUuid : $WANTED_ASSET_UUID OU le VariableDataItemId : $WANTED_DATA_ITEM_ID." | tee -a "$LOG_FILE"
-transfert_data "SELECT CAST(arrow_cast(time, 'Int64') AS VARCHAR) AS epoch_ns, \"AssetUuid\", \"Id\", \"Tag\", \"Type\", CAST(\"Value\" AS VARCHAR) AS \"Value\", CAST(\"CreatedAt\" AS VARCHAR) AS \"CreatedAt\" FROM \"$SOURCE_TABLE\" $VAR_CONDITION AND \"CreatedAt\" >= '$START_TIME_UTC' AND \"CreatedAt\" <= '$END_TIME_UTC'"
+# 4) Transfert
+echo "[~] Lancement du transfert de $TOTAL_NUMBER_LINES_TRANSFERRED lignes de la DB $SOURCE_DB vers la DB $TARGET_DB." | tee -a "$LOG_FILE"
+transfert_data "$CURRENT_TRANSFER_QUERY"
 
-# 5) Récupération du dernier timestamp écrit dans la DB TARGET
-SQL_QUERY="SELECT CAST(arrow_cast(time, 'Int64') AS VARCHAR) AS epoch_ns FROM \"$TARGET_TABLE\" $VAR_CONDITION AND \"CreatedAt\" >= '$START_TIME_UTC' AND \"CreatedAt\" <= '$END_TIME_UTC' ORDER BY time DESC LIMIT 1"
-RESPONSE=$("$SCRIPT_DIR/simple_request.sh" "$INFLUX_URL" "$INFLUX_TOKEN" "$TARGET_DB" "$SQL_QUERY")
-if [ $? -ne 0 ]; then
-    handle_error "[x] Erreur d'une requête sur influxdb3 (script simple_request.sh)."
-fi
+# 5) Récupération du dernier timestamp (pas de restriction MPS sur la table cible)
+SQL_QUERY_LAST_TIME="SELECT CAST(arrow_cast(time, 'Int64') AS VARCHAR) AS epoch_ns FROM \"$TARGET_TABLE\" $VAR_CONDITION AND \"CreatedAt\" >= '$START_TIME_UTC' AND \"CreatedAt\" <= '$END_TIME_UTC' ORDER BY time DESC LIMIT 1"
+RESPONSE=$("$SCRIPT_DIR/simple_request.sh" "$INFLUX_URL" "$INFLUX_TOKEN" "$TARGET_DB" "$SQL_QUERY_LAST_TIME")
+if [ $? -ne 0 ]; then handle_error "[x] Erreur requête dernier timestamp."; fi
 LAST_TIME=$(echo "$RESPONSE" | jq -r '.epoch_ns // empty' 2>/dev/null)
-# Si la variable est vide ou contient la chaîne "null", on l'initialise à 0 sans crasher
+
 if [ -z "$LAST_TIME" ] || [ "$LAST_TIME" == "null" ]; then
     LAST_TIME=0
-    echo "[~] Aucun timestamp récupéré (aucune donnée précédente transférée). LAST_TIME initialisé à 0." | tee -a "$LOG_FILE"
+    echo "[~] Aucun timestamp récupéré. LAST_TIME = 0." | tee -a "$LOG_FILE"
 else
-    echo "[~] Timestamp en nanosecondes de la colonne \"time\" de la dernière donnée transférée dans la DB $TARGET_DB : $LAST_TIME" | tee -a "$LOG_FILE"
+    echo "[~] Dernier timestamp (nanosecondes) : $LAST_TIME" | tee -a "$LOG_FILE"
 fi
 
-# 6) Période de buffer pour vérifier les données manquantes
+# 6) Buffer
 END_BUFFER_TIME_LOCAL=$(( $(date +%s) + BUFFER_TIME ))
-echo "[~] Début de la période de buffer de ${BUFFER_TIME} secondes à $(TZ="$TIMEZONE" date "+%H:%M:%S") heure locale ($TIMEZONE). Fin prévue vers $(TZ="$TIMEZONE" date -d "@$END_BUFFER_TIME_LOCAL" '+%H:%M:%S') heure locale ($TIMEZONE)." | tee -a "$LOG_FILE"
+echo "[~] Période de buffer de ${BUFFER_TIME}s. Fin prévue : $(TZ="$TIMEZONE" date -d "@$END_BUFFER_TIME_LOCAL" '+%H:%M:%S')." | tee -a "$LOG_FILE"
 sleep $BUFFER_TIME
-# 6.1) Comptage du nombre de données manquantes
+
 if [ "$LAST_TIME" -gt 0 ]; then
-    count_number_lines "SELECT COUNT(\"AssetUuid\") AS total_count FROM \"$SOURCE_TABLE\" $VAR_CONDITION AND \"CreatedAt\" >= '$START_TIME_UTC' AND \"CreatedAt\" <= '$END_TIME_UTC' AND time > arrow_cast($LAST_TIME, 'Timestamp(Nanosecond, None)')"
+    build_queries "time > arrow_cast($LAST_TIME, 'Timestamp(Nanosecond, None)')"
+    count_number_lines "$CURRENT_COUNT_QUERY"
     REMAINING_COUNT=$(echo "$RESPONSE_COUNT_DATA" | jq -r '.total_count // 0')
     BUFFER_NUMBER_LINES_TRANSFERRED=$REMAINING_COUNT
 else
     REMAINING_COUNT=0
 fi
+
 if [ "$REMAINING_COUNT" = "0" ]; then
     echo "[~] Buffer : aucune nouvelle donnée manquante détectée." | tee -a "$LOG_FILE"
 else
     echo "[!] Buffer : $REMAINING_COUNT nouvelles données manquantes détectées." | tee -a "$LOG_FILE"
-    # 6.2) Transfert des données manquantes
-    transfert_data "SELECT CAST(arrow_cast(time, 'Int64') AS VARCHAR) AS epoch_ns, \"AssetUuid\", \"Id\", \"Tag\", \"Type\", CAST(\"Value\" AS VARCHAR) AS \"Value\", CAST(\"CreatedAt\" AS VARCHAR) AS \"CreatedAt\" FROM \"$SOURCE_TABLE\" $VAR_CONDITION AND \"CreatedAt\" >= '$START_TIME_UTC' AND \"CreatedAt\" <= '$END_TIME_UTC' AND time > arrow_cast($LAST_TIME, 'Timestamp(Nanosecond, None)')"
+    transfert_data "$CURRENT_TRANSFER_QUERY"
 fi
 
-# Mettre à jour le Statut dans l'UNS vers Processed
-dialog_with_uns "UPDATE VariableRecordingRequest SET Statut = 'Processed' WHERE Id = '$VARIABLE_RECORDING_REQUEST_ID';" "Impossible de joindre SQL Server pour mettre à jour le statut vers Processed."
+dialog_with_uns "UPDATE VariableRecordingRequest SET Statut = 'Processed' WHERE Id = '$VARIABLE_RECORDING_REQUEST_ID';" "Erreur statut Processed."
 
-# Fin du script 
+# Fin
 TOTAL_NUMBER_LINES_TRANSFERRED=$((TOTAL_NUMBER_LINES_TRANSFERRED + BUFFER_NUMBER_LINES_TRANSFERRED))
 END_TS=$(date +%s)
 DURATION=$((END_TS - START_TS))
-# Temps de fin du transfert en UTC
 TRANSFERT_END_TIME_UTC=$(date -u +"%Y-%m-%dT%H:%M:%S")
-# Créer un enregistrement dans la table VariableRecordingLogs pour le transfert
-dialog_with_uns "INSERT INTO VariableRecordingLogs (VariableRecordingRequestId, UnsEquipmentName, OpenFactoryAssetUuid, UnsVariableName, OpenFactoryDataItemId, TransfertStartTime, TransfertEndTime, Duration, TotalNumberLinesTransfered, NumberLinesTransferedDuringBuffer, ErrorMessage) VALUES ('${VARIABLE_RECORDING_REQUEST_ID}', ${UNS_EQUIPMENT_NAME}, ${WANTED_ASSET_UUID}, ${UNS_VARIABLE_NAME}, ${WANTED_DATA_ITEM_ID}, '${TRANSFERT_START_TIME_UTC}', '${TRANSFERT_END_TIME_UTC}', '${DURATION}', '${TOTAL_NUMBER_LINES_TRANSFERRED}', '${BUFFER_NUMBER_LINES_TRANSFERRED}', '${SQL_ERR_MSG}');" "Impossible de joindre SQL Server pour créer un enregistrement dans VariableRecordingLogs."
 
-printf '[*] Temps écoulé depuis le lancement du script: %02d:%02d:%02d\n' $((DURATION / 3600)) $(((DURATION % 3600) / 60)) $((DURATION % 60))
-echo "[~] Script terminé. Statut = 'Processed', Transfert de ${TOTAL_NUMBER_LINES_TRANSFERRED} lignes dont ${BUFFER_NUMBER_LINES_TRANSFERRED} durant la période du buffer, Durée = ${DURATION} secondes, Début = $(TZ="$TIMEZONE" date -d "${TRANSFERT_START_TIME_UTC} UTC" +"%Y-%m-%dT%H:%M:%S") heure locale ($TIMEZONE), Fin = $(TZ="$TIMEZONE" date -d "${TRANSFERT_END_TIME_UTC} UTC" +"%Y-%m-%dT%H:%M:%S") heure locale ($TIMEZONE)." | tee -a "$LOG_FILE"
+dialog_with_uns "INSERT INTO VariableRecordingLogs (VariableRecordingRequestId, UnsEquipmentName, OpenFactoryAssetUuid, UnsVariableName, OpenFactoryDataItemId, TransfertStartTime, TransfertEndTime, Duration, TotalNumberLinesTransfered, NumberLinesTransferedDuringBuffer, ErrorMessage) VALUES ('${VARIABLE_RECORDING_REQUEST_ID}', ${UNS_EQUIPMENT_NAME}, ${WANTED_ASSET_UUID}, ${UNS_VARIABLE_NAME}, ${WANTED_DATA_ITEM_ID}, '${TRANSFERT_START_TIME_UTC}', '${TRANSFERT_END_TIME_UTC}', '${DURATION}', '${TOTAL_NUMBER_LINES_TRANSFERRED}', '${BUFFER_NUMBER_LINES_TRANSFERRED}', ${SQL_ERR_MSG});" "Erreur log final."
+
+printf '[*] Temps écoulé: %02d:%02d:%02d\n' $((DURATION / 3600)) $(((DURATION % 3600) / 60)) $((DURATION % 60))
+echo "[~] Terminé. Statut='Processed', Lignes=${TOTAL_NUMBER_LINES_TRANSFERRED}, Buffer=${BUFFER_NUMBER_LINES_TRANSFERRED}, Durée=${DURATION}s." | tee -a "$LOG_FILE"
