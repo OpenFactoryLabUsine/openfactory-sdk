@@ -11,6 +11,7 @@ fi
 
 # Configuration
 IS_AUTOMATED="false"
+PERIOD_CHOICE=""
 UNS_EQUIPMENT_ID=${1:-"NULL"}
 UNS_VARIABLE_ID=${2:-"NULL"}
 LOCAL_START_TIME=${3:-""}
@@ -96,6 +97,15 @@ if [ "$IS_AUTOMATED" == "true" ]; then
 else
     clear
     echo "Mode manuel"
+    read -p "Voulez-vous créer une demande d'enregistrement avec une période spécifique ou à l'infini ? (1: Période spécifique, 2: À l'infini) : " PERIOD_CHOICE
+    if [ "$PERIOD_CHOICE" == "1" ]; then
+        echo "Vous avez choisi de créer une demande d'enregistrement avec une période spécifique."
+    elif [ "$PERIOD_CHOICE" == "2" ]; then
+        echo "Vous avez choisi de créer une demande d'enregistrement à l'infini."
+    else
+        echo "[x] Choix invalide. Veuillez réessayer."
+        exit 1
+    fi
 
     echo "--- Sélection du nom de l'équipement à enregistrer ---"
     get_uns_data "SET NOCOUNT ON; SELECT UnsEquipmentName FROM Equipment;"
@@ -142,16 +152,18 @@ else
 
     clear
 
-    while true; do
-        read -p "[Facultatif] Entrez l'heure de fin d'enregistrement dans votre TimeZone (format: YYYY-MM-DDTHH:MM:SS) (exemple: 2026-06-26T13:15:17) : " LOCAL_END_TIME
-        if [ -z "$LOCAL_END_TIME" ]; then
-            LOCAL_END_TIME="NULL"
-        else
-            check_if_data_is_timestamp "$LOCAL_END_TIME" || continue
-            LOCAL_END_TIME="'$LOCAL_END_TIME'"
-        fi
-        break
-    done
+    if [[ "$PERIOD_CHOICE" == "1" ]]; then
+        while true; do
+            read -p "[Facultatif] Entrez l'heure de fin d'enregistrement dans votre TimeZone (format: YYYY-MM-DDTHH:MM:SS) (exemple: 2026-06-26T13:15:17) : " LOCAL_END_TIME
+            if [ -z "$LOCAL_END_TIME" ]; then
+                LOCAL_END_TIME="NULL"
+            else
+                check_if_data_is_timestamp "$LOCAL_END_TIME" || continue
+                LOCAL_END_TIME="'$LOCAL_END_TIME'"
+            fi
+            break
+        done
+    fi
 
     while true; do
         read -p "[Facultatif] Entrez votre TimeZone (exemple: America/Toronto) (défaut: America/Toronto) : " TIME_ZONE
@@ -172,21 +184,16 @@ else
         check_if_data_is_integer "$BUFFER_TIME" || continue
         break
     done
-
-    while true; do
-        read -p "[Facultatif] Entrez le MPS (mesures par seconde) (en secondes) (exemple: 60) : " MPS
-        if [ -z "$MPS" ]; then
-            MPS="NULL"
-        else
-            check_if_data_is_integer "$MPS" || continue
-            MPS="$MPS"
-        fi
-        break
-    done
 fi
 
 echo "Création de la demande d'enregistrement de variable dans UNS..."
-message=$(update_uns "INSERT INTO VariableRecordingRequest (EquipmentId, VariableId, Statut, LocalStartTime, LocalEndTime, Mps, BufferTime, TimeZone) VALUES ($UNS_EQUIPMENT_ID, $UNS_VARIABLE_ID, 'Planned', '$LOCAL_START_TIME', $LOCAL_END_TIME, $MPS, '$BUFFER_TIME', '$TIME_ZONE');")
+
+if [[ "$PERIODE_CHOICE" == "1" ]]; then
+    message=$(update_uns "INSERT INTO VariableRecordingRequest (EquipmentId, VariableId, Statut, LocalStartTime, LocalEndTime, BufferTime, TimeZone) VALUES ($UNS_EQUIPMENT_ID, $UNS_VARIABLE_ID, 'Planned', '$LOCAL_START_TIME', $LOCAL_END_TIME, '$BUFFER_TIME', '$TIME_ZONE');")
+elif [[ "$PERIODE_CHOICE" == "2" ]]; then
+    message=$(update_uns "INSERT INTO VariableRecordingRequest (EquipmentId, VariableId, Statut, LocalStartTime, LocalEndTime, BufferTime, TimeZone) VALUES ($UNS_EQUIPMENT_ID, $UNS_VARIABLE_ID, 'TelegrafAutomation', '$LOCAL_START_TIME', $LOCAL_END_TIME, '$BUFFER_TIME', '$TIME_ZONE');")
+fi
+
 echo "$message"
 if [ $? -ne 0 ]; then
     echo "[x] Impossible de joindre SQL Server pour ajouter la demande d'enregistrement." >&2
