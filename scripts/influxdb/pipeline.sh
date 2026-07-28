@@ -160,7 +160,7 @@ get_variable_recording_request_data() {
         INFLUX_DATA_ITEM_ID="NULL"
     fi
 
-    if [[ "$STATUT" = "Processed" || "$STATUT" = "InProgress" ]]; then
+    if [[ "$STATUT" = "Processed" || "$STATUT" = "InProgress" || "$STATUT" = "TelegrafAutomation" ]]; then
         handle_error "La demande est en statut $STATUT, impossible de lancer le script."
     elif [[ -z "$LOCAL_END_TIME" || "$LOCAL_END_TIME" < "$LOCAL_START_TIME" || ! "$LOCAL_END_TIME" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}$ || ! "$LOCAL_START_TIME" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}$ ]]; then
         handle_error "Dates locales invalides (incohérence ou format). Veuillez vérifier."
