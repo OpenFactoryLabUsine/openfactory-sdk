@@ -34,7 +34,6 @@ DB_PASS=$DB_PASS
 # Variables qui vont être mises à jour
 LAST_TIME=""
 END_BUFFER_TIME_LOCAL=""
-USE_MPS=false
 
 # Variables pour l'UNS
 STATUT="InProgress"
@@ -115,20 +114,12 @@ check_if_uns_data_exists() {
 }
 
 get_variable_recording_request_data() {
-    local query="SET NOCOUNT ON; SELECT COALESCE(CAST(EquipmentId AS VARCHAR), 'NULL_VALUE'), COALESCE(CAST(VariableId AS VARCHAR), 'NULL_VALUE'), Statut, LocalStartTime, LocalEndTime, Mps, BufferTime, TimeZone FROM VariableRecordingRequest WHERE id = '$VARIABLE_RECORDING_REQUEST_ID';"
+    local query="SET NOCOUNT ON; SELECT COALESCE(CAST(EquipmentId AS VARCHAR), 'NULL_VALUE'), COALESCE(CAST(VariableId AS VARCHAR), 'NULL_VALUE'), Statut, LocalStartTime, LocalEndTime, BufferTime, TimeZone FROM VariableRecordingRequest WHERE id = '$VARIABLE_RECORDING_REQUEST_ID';"
     data=$(sqlcmd -S "$DB_SERVER" -d "$DB_NAME" -U "$DB_USER" -P "$DB_PASS" -C -b -h -1 -W -s "|" -Q "$query" 2>/dev/null)
     if [ $? -ne 0 ] || [ -z "$data" ]; then
         handle_error "Impossible de joindre SQL Server." "true"
     fi
-    IFS='|' read -r WANTED_EQUIPMENT_ID WANTED_VARIABLE_ID STATUT LOCAL_START_TIME LOCAL_END_TIME MPS BUFFER_TIME TIMEZONE <<< "$data"
-
-    # Vérification et Activation de la limite MPS
-    MPS=$(echo "$MPS" | tr -d ' ' | tr -d '\r' | tr -d '\n')
-    if [[ "$MPS" == "NULL" || "$MPS" == "NULL_VALUE" || -z "$MPS" || ! "$MPS" =~ ^[0-9]+$ || "$MPS" -eq 0 ]]; then
-        USE_MPS=false
-    else
-        USE_MPS=true
-    fi
+    IFS='|' read -r WANTED_EQUIPMENT_ID WANTED_VARIABLE_ID STATUT LOCAL_START_TIME LOCAL_END_TIME BUFFER_TIME TIMEZONE <<< "$data"
 
     # Vérification des IDs
     if [[ "$WANTED_VARIABLE_ID" == 'NULL_VALUE' && "$WANTED_EQUIPMENT_ID" == 'NULL_VALUE' ]]; then
@@ -216,18 +207,11 @@ build_queries() {
         current_where="$current_where AND $extra_condition"
     fi
     
-    if [ "$USE_MPS" = true ]; then
-        # On utilise ROW_NUMBER() et DATE_BIN() pour ne garder que $MPS éléments par seconde
-        CURRENT_COUNT_QUERY="SELECT COUNT(\"AssetUuid\") AS total_count FROM (SELECT \"AssetUuid\", ROW_NUMBER() OVER(PARTITION BY \"AssetUuid\", \"Id\", \"Tag\", DATE_BIN(INTERVAL '1 second', time) ORDER BY time) as rn FROM \"$SOURCE_TABLE\" $current_where) WHERE rn <= $MPS"
-        CURRENT_TRANSFER_QUERY="SELECT epoch_ns, \"AssetUuid\", \"Id\", \"Tag\", \"Type\", \"Value\", \"CreatedAt\" FROM (SELECT CAST(arrow_cast(time, 'Int64') AS VARCHAR) AS epoch_ns, \"AssetUuid\", \"Id\", \"Tag\", \"Type\", CAST(\"Value\" AS VARCHAR) AS \"Value\", CAST(\"CreatedAt\" AS VARCHAR) AS \"CreatedAt\", ROW_NUMBER() OVER(PARTITION BY \"AssetUuid\", \"Id\", \"Tag\", DATE_BIN(INTERVAL '1 second', time) ORDER BY time) as rn FROM \"$SOURCE_TABLE\" $current_where) WHERE rn <= $MPS"
-    else
-        CURRENT_COUNT_QUERY="SELECT COUNT(\"AssetUuid\") AS total_count FROM \"$SOURCE_TABLE\" $current_where"
-        CURRENT_TRANSFER_QUERY="SELECT CAST(arrow_cast(time, 'Int64') AS VARCHAR) AS epoch_ns, \"AssetUuid\", \"Id\", \"Tag\", \"Type\", CAST(\"Value\" AS VARCHAR) AS \"Value\", CAST(\"CreatedAt\" AS VARCHAR) AS \"CreatedAt\" FROM \"$SOURCE_TABLE\" $current_where"
-    fi
+    CURRENT_COUNT_QUERY="SELECT COUNT(\"AssetUuid\") AS total_count FROM \"$SOURCE_TABLE\" $current_where"
+    CURRENT_TRANSFER_QUERY="SELECT CAST(arrow_cast(time, 'Int64') AS VARCHAR) AS epoch_ns, \"AssetUuid\", \"Id\", \"Tag\", \"Type\", CAST(\"Value\" AS VARCHAR) AS \"Value\", CAST(\"CreatedAt\" AS VARCHAR) AS \"CreatedAt\" FROM \"$SOURCE_TABLE\" $current_where"
 }
 
 echo "[~] Début du script. AssetUuid : $INFLUX_ASSET_UUID, VariableDataItemId : $INFLUX_DATA_ITEM_ID, période : $START_TIME_UTC à $END_TIME_UTC. (UTC)"  | tee -a "$LOG_FILE"
-if [ "$USE_MPS" = true ]; then echo "[~] Limite de données activée : Maximum $MPS mesures par seconde." | tee -a "$LOG_FILE"; fi
 
 # 3) Génération et exécution du comptage initial
 build_queries ""
@@ -238,7 +222,7 @@ TOTAL_NUMBER_LINES_TRANSFERRED=$(echo "$RESPONSE_COUNT_DATA" | jq -r '.total_cou
 echo "[~] Lancement du transfert de $TOTAL_NUMBER_LINES_TRANSFERRED lignes de la DB $SOURCE_DB vers la DB $TARGET_DB." | tee -a "$LOG_FILE"
 transfert_data "$CURRENT_TRANSFER_QUERY"
 
-# 5) Récupération du dernier timestamp (pas de restriction MPS sur la table cible)
+# 5) Récupération du dernier timestamp
 SQL_QUERY_LAST_TIME="SELECT CAST(arrow_cast(time, 'Int64') AS VARCHAR) AS epoch_ns FROM \"$TARGET_TABLE\" $VAR_CONDITION AND \"CreatedAt\" >= '$START_TIME_UTC' AND \"CreatedAt\" <= '$END_TIME_UTC' ORDER BY time DESC LIMIT 1"
 RESPONSE=$("$SCRIPT_DIR/simple_request.sh" "$INFLUX_URL" "$INFLUX_TOKEN" "$TARGET_DB" "$SQL_QUERY_LAST_TIME")
 if [ $? -ne 0 ]; then handle_error "[x] Erreur requête dernier timestamp."; fi
