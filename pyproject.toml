@@ -8,6 +8,7 @@ dependencies = [
 
 [tool.setuptools]
 packages = []
+exclude = ["influxdb3*", "unscribe*", "influxdb3-ui*"]
 
 [project.optional-dependencies]
 dev = [
@@ -20,6 +21,3 @@ dev = [
 [build-system]
 requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
-
-[tool.setuptools.packages.find]
-exclude = ["influxdb3*", "unscribe*", "influxdb3-ui*"]
