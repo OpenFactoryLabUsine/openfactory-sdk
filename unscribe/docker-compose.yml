@@ -1,0 +1,23 @@
+services:
+  unscribe:
+    image: ghcr.io/openfactorylabusine/unscribe:latest
+    container_name: unscribe
+    environment:
+      - SERVER=mssql-db
+      - DATABASE=labusine_db
+      - USER=sa
+      - PASSWORD=${SQL_SA_PASSWORD}
+    ports:
+      - "5555:5555"
+    networks:
+      - factory-net
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+volumes:
+  sqlserver_data:
+
+networks:
+  factory-net:
+    name: factory-net
+    external: true
