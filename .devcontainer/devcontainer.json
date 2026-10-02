@@ -35,14 +35,6 @@
       "label": "Traefik",
       "onAutoForward": "openBrowser"
     },
-    "8888": {
-      "label": "Influx Explorer",
-      "onAutoForward": "openBrowser"
-    },
-    "8181": {
-      "label": "InfluxDB",
-      "onAutoForward": "openBrowser"
-    },
     "9092": {
       "label": "Kafka",
       "onAutoForward": "silent"
