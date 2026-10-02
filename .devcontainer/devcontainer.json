@@ -30,7 +30,7 @@
     "ENVIRONMENT": "local",
     "OPENFACTORY_UNS_SCHEMA": "/workspaces/openfactory-sdk/.devcontainer/uns.yml"
   },
-  "forwardPorts": [80, 8888, 8181, 9092, 9094, 3000, 9090, 12345],
+  "forwardPorts": [80, 9092, 9094, 3000, 9090, 12345],
   "portsAttributes": {
     "80": {
       "label": "Traefik",
@@ -46,14 +46,6 @@
     },
     "12345": {
       "label": "Grafana Alloy",
-      "onAutoForward": "openBrowser"
-    },
-    "8888": {
-      "label": "Influx Explorer",
-      "onAutoForward": "openBrowser"
-    },
-    "8181": {
-      "label": "InfluxDB",
       "onAutoForward": "openBrowser"
     },
     "9092": {

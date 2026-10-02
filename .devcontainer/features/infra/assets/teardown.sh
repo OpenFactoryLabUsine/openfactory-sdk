@@ -37,7 +37,6 @@ SDK_PATH="/usr/local/share/openfactory-sdk"
 KAFKA_COMPOSE_FILE="${SDK_PATH}/openfactory-infra/docker-compose.yml"
 TRAEFIK_COMPOSE_FILE="${SDK_PATH}/openfactory-infra/docker-compose.traefik.yml"
 FAN_OUT_LAYER_COMPOSE_FILE="${SDK_PATH}/openfactory-fanoutlayer/docker-compose.yml"
-INFLUXDB_COMPOSE_FILE="${SDK_PATH}/openfactory-infra/docker-compose.influxdb.yml"
 FAN_OUT_LAYER_COMPOSE_FILE="${SDK_PATH}/openfactory-infra/docker-compose.nats.yml"
 PROMETHEUS_COMPOSE_FILE="${SDK_PATH}/openfactory-infra/docker-compose.prometheus.yml"
 
@@ -49,10 +48,6 @@ ofa apps down ${SDK_PATH}/openfactory-infra/fanoutlayer
 # Tear down fan-out layer
 echo "🐳  Stopping OpenFactory fan-out layer..."
 docker compose "${COMPOSE_ENV_ARGS[@]}" -f "$FAN_OUT_LAYER_COMPOSE_FILE" -p fan-out-layer down -v
-
-# Tear down InfluxDB
-echo "🐳  Stopping InfluxDB..."
-docker compose "${COMPOSE_ENV_ARGS[@]}" -f "$INFLUXDB_COMPOSE_FILE" -p influxdb down -v
 
 # Tear down Traefik
 echo "🐳  Stopping Traefik..."
